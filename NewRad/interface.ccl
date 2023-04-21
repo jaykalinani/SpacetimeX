@@ -2,8 +2,6 @@
 
 IMPLEMENTS: NewRad
 
-INHERITS: BaikalX
-
-
+INHERITS: Z4c
 
 USES INCLUDE HEADER: loop.hxx
