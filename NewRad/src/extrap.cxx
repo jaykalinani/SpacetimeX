@@ -9,16 +9,17 @@ using namespace Loop;
 void extrap(const cGH *restrict const cctkGH, CCTK_REAL *restrict const var) {
   const GF3D<CCTK_REAL, 0, 0, 0> var_(cctkGH, var);
 
-  loop_bnd<0, 0, 0>(cctkGH,
+  const Loop::GridDescBaseDevice grid(cctkGH);
+  grid.loop_bnd_device<0, 0, 0>(cctkGH,
                     [&](const PointDesc &p) { var_(p.I) = var_(p.I - p.NI); });
 }
 
 extern "C" void NewRad_Extrapolate(CCTK_ARGUMENTS) {
-  DECLARE_CCTK_ARGUMENTS_NewRad_Extrapolate;
+  DECLARE_CCTK_ARGUMENTSX_NewRad_Extrapolate;
 
-  extrap(cctkGH, lambdaU0GF);
-  extrap(cctkGH, lambdaU1GF);
-  extrap(cctkGH, lambdaU2GF);
+  extrap(cctkGH, Gamtx);
+  extrap(cctkGH, Gamty);
+  extrap(cctkGH, Gamtz);
 
   // extrap(cctkGH, aDD00GF);
   // extrap(cctkGH, aDD01GF);

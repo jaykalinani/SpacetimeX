@@ -70,7 +70,8 @@ void newrad(const cGH *restrict const cctkGH,
         assert(0);
       }};
 
-  loop_bnd<0, 0, 0>(cctkGH, [&](const PointDesc &p) {
+  const Loop::GridDescBaseDevice grid(cctkGH);
+  grid.loop_bnd_device<0, 0, 0>(cctkGH, [&](const PointDesc &p) {
     // The main part of the boundary condition assumes that we have an
     // outgoing radial wave with some speed v0:
     //
@@ -102,32 +103,28 @@ void newrad(const cGH *restrict const cctkGH,
 }
 
 extern "C" void NewRad_Apply(CCTK_ARGUMENTS) {
-  DECLARE_CCTK_ARGUMENTS_NewRad_Apply;
+  DECLARE_CCTK_ARGUMENTSX_NewRad_Apply;
 
-  newrad(cctkGH, aDD00GF, aDD00_rhsGF, 0, 1);
-  newrad(cctkGH, aDD01GF, aDD01_rhsGF, 0, 1);
-  newrad(cctkGH, aDD02GF, aDD02_rhsGF, 0, 1);
-  newrad(cctkGH, aDD11GF, aDD11_rhsGF, 0, 1);
-  newrad(cctkGH, aDD12GF, aDD12_rhsGF, 0, 1);
-  newrad(cctkGH, aDD22GF, aDD22_rhsGF, 0, 1);
-  newrad(cctkGH, alphaGF, alpha_rhsGF, 1, 1);
-  newrad(cctkGH, betU0GF, betU0_rhsGF, 0, 1);
-  newrad(cctkGH, betU1GF, betU1_rhsGF, 0, 1);
-  newrad(cctkGH, betU2GF, betU2_rhsGF, 0, 1);
-  newrad(cctkGH, cfGF, cf_rhsGF, 1, 1);
-  newrad(cctkGH, hDD00GF, hDD00_rhsGF, 0, 1);
-  newrad(cctkGH, hDD01GF, hDD01_rhsGF, 0, 1);
-  newrad(cctkGH, hDD02GF, hDD02_rhsGF, 0, 1);
-  newrad(cctkGH, hDD11GF, hDD11_rhsGF, 0, 1);
-  newrad(cctkGH, hDD12GF, hDD12_rhsGF, 0, 1);
-  newrad(cctkGH, hDD22GF, hDD22_rhsGF, 0, 1);
-  newrad(cctkGH, lambdaU0GF, lambdaU0_rhsGF, 0, 1);
-  newrad(cctkGH, lambdaU1GF, lambdaU1_rhsGF, 0, 1);
-  newrad(cctkGH, lambdaU2GF, lambdaU2_rhsGF, 0, 1);
-  newrad(cctkGH, trKGF, trK_rhsGF, 0, 1);
-  newrad(cctkGH, vetU0GF, vetU0_rhsGF, 0, 1);
-  newrad(cctkGH, vetU1GF, vetU1_rhsGF, 0, 1);
-  newrad(cctkGH, vetU2GF, vetU2_rhsGF, 0, 1);
+  newrad(cctkGH, chi, chi_rhs, 0, 1);
+  newrad(cctkGH, gammatxx, gammatxx_rhs, 0, 1);
+  newrad(cctkGH, gammatxy, gammatxy_rhs, 0, 1);
+  newrad(cctkGH, gammatxz, gammatxz_rhs, 0, 1);
+  newrad(cctkGH, gammatyy, gammatyy_rhs, 0, 1);
+  newrad(cctkGH, gammatyz, gammatyz_rhs, 0, 1);
+  newrad(cctkGH, gammatzz, gammatzz_rhs, 0, 1);
+  newrad(cctkGH, Kh, Kh_rhs, 0, 1);
+  newrad(cctkGH, Atxx, Atxx_rhs, 0, 1);
+  newrad(cctkGH, Atxy, Atxy_rhs, 0, 1);
+  newrad(cctkGH, Atxz, Atxz_rhs, 0, 1);
+  newrad(cctkGH, Atyy, Atyy_rhs, 0, 1);
+  newrad(cctkGH, Atyz, Atyz_rhs, 0, 1);
+  newrad(cctkGH, Atzz, Atzz_rhs, 0, 1);
+  newrad(cctkGH, Gamtx, Gamtx_rhs, 0, 1);
+  newrad(cctkGH, Gamty, Gamty_rhs, 0, 1);
+  newrad(cctkGH, Gamtz, Gamtz_rhs, 0, 1);
+  newrad(cctkGH, Theta, Theta_rhs, 0, 1);
+  newrad(cctkGH, alphaG, alphaG_rhs, 1, 1);
+  newrad(cctkGH, betaG, betaG_rhs, 0, 1);
 }
 
 } // namespace NewRad
