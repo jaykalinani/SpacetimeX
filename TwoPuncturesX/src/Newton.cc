@@ -468,7 +468,7 @@ void Newton(const cGH* const cctkGH, int const nvar, int const n1,
     }
 
     fflush(stdout);
-    ii = bicgstab(cctkGH, nvar, n1, n2, n3, v, dv, verbose, 100, dmax * 1.e-3,
+    ii = bicgstab(cctkGH, nvar, n1, n2, n3, v, dv, verbose, itmax, tol,
                   &normres);
     // #pragma omp parallel for
     for (int j = 0; j < ntotal; j++)
