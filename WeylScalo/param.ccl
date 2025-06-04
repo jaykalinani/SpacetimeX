@@ -1,0 +1,17 @@
+# Parameter definitions for thorn WeylScalo
+
+CCTK_INT deriv_order "Order of spatial finite differencing" STEERABLE=never
+{
+  2 :: "Second order finite difference"
+  4 :: "Fourth order finite difference"
+  6 :: "Sixth order finite difference"
+  8 :: "Eighth order finite difference"
+} 4
+
+BOOLEAN calc_derivs_live "Calculate FD derivstives on the fly instead of storing to temporary variables"
+{
+} yes
+
+BOOLEAN elecmag_weyl "Calculate the Weyl scalars via the electric and magnetic tensors?"
+{
+} yes

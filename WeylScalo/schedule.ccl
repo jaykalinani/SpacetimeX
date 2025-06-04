@@ -1,0 +1,23 @@
+# File produced by Kranc
+
+STORAGE: Psi4r_group
+STORAGE: Psi4i_group
+
+SCHEDULE GROUP WeylScalo_calc_psi4_group AT postinitial
+{
+} "WeylScalo_calc_psi4_group"
+
+SCHEDULE GROUP WeylScalo_calc_psi4_group AT evol AFTER (ODESolvers_Solve, ODESolvers_Solve_Subcycling)
+{
+} "WeylScalo_psi4_calc_4th_group"
+
+SCHEDULE WeylScalo_calc_psi4 IN WeylScalo_calc_psi4_group
+{
+  LANG: C
+  READS: ADMBaseX::metric(everywhere)
+  READS: ADMBaseX::curv(everywhere)
+  WRITES: Psi4i_group(interior)
+  WRITES: Psi4r_group(interior)
+  SYNC: Psi4i_group
+  SYNC: Psi4r_group
+} "WeylScalo_calc_psi4"
