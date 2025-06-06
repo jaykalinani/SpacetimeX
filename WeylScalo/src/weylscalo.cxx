@@ -53,14 +53,54 @@ extern "C" void WeylScalo_calc_psi4(CCTK_ARGUMENTS) {
   // Loop
   const Loop::GridDescBaseDevice grid(cctkGH);
 
-  // Derivs Lambdas
+  if (calc_derivs_live) {
+
+    // Derivs Lambdas
 #include "../wolfram/WeylScalo_derivs1st.hxx"
 #include "../wolfram/WeylScalo_derivs2nd.hxx"
 
-  if(elecmag_weyl) {
+    if (elecmag_weyl) {
 #include "../wolfram/WeylScalo_set_Psi4.hxx"
-  } else {
+    } else {
 #include "../wolfram/WeylScalo_set_Psi4_GaussCodazzi.hxx"
+    }
+
+  } else {
+
+    // Tile variables for derivatives and so on
+    const int ntmps = 72;
+    int itmp = 0;
+    const GF3D5layout layout5 = STXUtils::get_GF3D5layout<0, 0, 0>(cctkGH);
+    STXUtils::GF3D5Factory<CCTK_REAL> fct(layout5, ntmps, itmp);
+
+    const auto tl_dgam = fct.make_smat_vec_gf();
+    const auto tl_ddgam = fct.make_smat_smat_gf();
+    const auto tl_dexK = fct.make_smat_vec_gf();
+
+    if (itmp != ntmps)
+      CCTK_VERROR("Wrong number of temporary variables: ntmps=%d itmp=%d",
+                  ntmps, itmp);
+    itmp = -1;
+
+    // Define derivs lambdas
+    const auto calcderivs1st = [&](const auto &dgf, const auto &gf_) {
+      calc_derivs1st<0, 0, 0>(grid, layout5, dgf, layout2, gf_, invDxyz,
+                              deriv_order);
+    };
+    const auto calcderivs2nd = [&](const auto &dgf, const auto &ddgf,
+                                   const auto &gf_) {
+      calc_derivs2nd<0, 0, 0>(grid, layout5, dgf, ddgf, layout2, gf_, invDxyz,
+                              deriv_order);
+    };
+
+    calcderivs2nd(tl_dgam, tl_ddgam, gf_gam);
+    calcderivs1st(tl_dexK, gf_exK);
+
+    if (elecmag_weyl) {
+#include "../wolfram/WeylScalo_set_Psi4_GF3D5.hxx"
+    } else {
+#include "../wolfram/WeylScalo_set_Psi4_GaussCodazzi_GF3D5.hxx"
+    }
   }
 }
 
