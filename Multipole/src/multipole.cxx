@@ -224,7 +224,7 @@ extern "C" void Multipole_Calc(CCTK_ARGUMENTS) {
       } // loop over l
 
       const double integr_finish_time = gettime();
-      total_integr_time += integr_finish_time - interp_start_time;
+      total_integr_time += integr_finish_time - integr_start_time;
 
       g_sphere->output1D(CCTK_PASS_CTOC, g_vars[v], radius[i]);
 
