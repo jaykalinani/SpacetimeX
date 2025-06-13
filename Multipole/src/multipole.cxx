@@ -2,6 +2,8 @@
 #include "io.hxx"
 #include "surface.hxx"
 
+#include <sys/time.h>
+
 #include <assert.h>
 #include <iomanip>
 #include <sstream>
@@ -14,6 +16,14 @@
 
 namespace Multipole {
 using namespace std;
+
+namespace {
+double gettime() {
+  timeval tv;
+  gettimeofday(&tv, nullptr);
+  return tv.tv_sec + tv.tv_usec / 1.0e+6;
+}
+} // namespace
 
 static Sphere *g_sphere = nullptr;
 
@@ -166,6 +176,8 @@ extern "C" void Multipole_Finalize(CCTK_ARGUMENTS) {
 //   2) Integrate psi4 with the ylm's over that sphere
 //   3) Output the mode decomposed psi4
 extern "C" void Multipole_Calc(CCTK_ARGUMENTS) {
+  const double start_time = gettime();
+
   DECLARE_CCTK_ARGUMENTS_Multipole_Calc;
   DECLARE_CCTK_PARAMETERS;
 
@@ -176,6 +188,9 @@ extern "C" void Multipole_Calc(CCTK_ARGUMENTS) {
 
   ModeArray modes(n_variables, nradii, l_max);
 
+  double total_interp_time = 0;
+  double total_integr_time = 0;
+
   for (int v = 0; v < n_variables; v++) {
     int si = findIntInArray(g_vars[v].spinWeight, g_spin_weights);
     assert(si != -1);
@@ -185,9 +200,16 @@ extern "C" void Multipole_Calc(CCTK_ARGUMENTS) {
       // Set radius of the sphere
       g_sphere->setRadius(radius[i]);
 
+      const double interp_start_time = gettime();
+
       // Interpolate to the sphere
       g_sphere->interpolate(CCTK_PASS_CTOC, g_vars[v].realIndex,
                             g_vars[v].imagIndex);
+
+      const double interp_finish_time = gettime();
+      total_interp_time += interp_finish_time - interp_start_time;
+
+      const double integr_start_time = gettime();
 
       // Intergate of conj(sYlm)*F*sin(theta) over the sphere at radiusr[i]
       for (int l = 0; l <= l_max; l++) {
@@ -201,12 +223,26 @@ extern "C" void Multipole_Calc(CCTK_ARGUMENTS) {
         } // loop over m
       } // loop over l
 
+      const double integr_finish_time = gettime();
+      total_integr_time += integr_finish_time - interp_start_time;
+
       g_sphere->output1D(CCTK_PASS_CTOC, g_vars[v], radius[i]);
 
     } // loop over radii
   } // loop over variables
 
   outputModes(CCTK_PASS_CTOC, g_vars.data(), radius, modes);
+
+  const double finish_time = gettime();
+
+  const double total_time = finish_time - start_time;
+
+  CCTK_VINFO("Total Multipole time: %g;\n"
+             "  Interpolation time: %g, %g%%\n"
+             "  Integration   time: %g, %g%%\n",
+             total_time, total_interp_time,
+             total_interp_time / total_time * 100, total_integr_time,
+             total_integr_time / total_time * 100);
 }
 
 } // namespace Multipole
