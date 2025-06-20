@@ -190,6 +190,7 @@ extern "C" void Multipole_Calc(CCTK_ARGUMENTS) {
 
   double total_interp_time = 0;
   double total_integr_time = 0;
+  double total_outp1d_time = 0;
 
   for (int v = 0; v < n_variables; v++) {
     int si = findIntInArray(g_vars[v].spinWeight, g_spin_weights);
@@ -226,7 +227,12 @@ extern "C" void Multipole_Calc(CCTK_ARGUMENTS) {
       const double integr_finish_time = gettime();
       total_integr_time += integr_finish_time - integr_start_time;
 
+      const double outp1d_start_time = gettime();
+
       g_sphere->output1D(CCTK_PASS_CTOC, g_vars[v], radius[i]);
+
+      const double outp1d_finish_time = gettime();
+      total_outp1d_time += outp1d_finish_time - outp1d_start_time;
 
     } // loop over radii
   } // loop over variables
