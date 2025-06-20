@@ -245,10 +245,12 @@ extern "C" void Multipole_Calc(CCTK_ARGUMENTS) {
 
   CCTK_VINFO("Total Multipole time: %g;\n"
              "  Interpolation time: %g, %g%%\n"
-             "  Integration   time: %g, %g%%\n",
+             "  Integration   time: %g, %g%%\n"
+             "  Output1D      time: %g, %g%%\n",
              total_time, total_interp_time,
              total_interp_time / total_time * 100, total_integr_time,
-             total_integr_time / total_time * 100);
+             total_integr_time / total_time * 100, total_outp1d_time,
+             total_outp1d_time / total_time * 100);
 }
 
 } // namespace Multipole
