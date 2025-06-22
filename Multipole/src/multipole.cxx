@@ -39,9 +39,6 @@ static void outputModes(CCTK_ARGUMENTS, const VariableParse vars[],
   DECLARE_CCTK_PARAMETERS;
 
   double total_outfile_time = 0;
-  double total_openfile_time = 0;
-  double total_closefile_time = 0;
-  double total_print_time = 0;
 
   if (output_tsv && CCTK_MyProc(cctkGH) == 0) {
     for (int v = 0; v < modes.getNumVars(); ++v) {
@@ -94,15 +91,7 @@ static void outputModes(CCTK_ARGUMENTS, const VariableParse vars[],
       }
     }
 
-    CCTK_VINFO("Total Outfile time: %g;\n"
-               "  OpenFile    time: %g, %g%%\n"
-               "  Print       time: %g, %g%%\n"
-               "  CloseFile   time: %g, %g%%\n",
-               total_outfile_time, total_openfile_time,
-               total_openfile_time / total_outfile_time * 100, total_print_time,
-               total_print_time / total_outfile_time * 100,
-               total_closefile_time,
-               total_closefile_time / total_outfile_time * 100);
+    CCTK_VINFO("Total Outfile time: %g;\n", total_outfile_time);
   }
   if (output_hdf5 && CCTK_MyProc(cctkGH) == 0) {
     OutputComplexToH5File(CCTK_PASS_CTOC, vars, radii, modes);
