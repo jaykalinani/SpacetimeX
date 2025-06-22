@@ -38,8 +38,6 @@ static void outputModes(CCTK_ARGUMENTS, const VariableParse vars[],
   DECLARE_CCTK_ARGUMENTS;
   DECLARE_CCTK_PARAMETERS;
 
-  double total_outfile_time = 0;
-
   if (output_tsv && CCTK_MyProc(cctkGH) == 0) {
     for (int v = 0; v < modes.getNumVars(); ++v) {
       for (int i = 0; i < modes.getNumRadii(); ++i) {
@@ -49,8 +47,6 @@ static void outputModes(CCTK_ARGUMENTS, const VariableParse vars[],
             std::ostringstream fileName;
             fileName << "mp_" << vars[v].name << "_l" << l << "_m" << m << "_r"
                      << std::fixed << std::setprecision(2) << rad << ".tsv";
-
-            const double outfile_start_time = gettime();
 
             std::string name = fileName.str();
 
@@ -83,15 +79,10 @@ static void outputModes(CCTK_ARGUMENTS, const VariableParse vars[],
                                  << modes(v, i, l, m, 0) << " "
                                  << modes(v, i, l, m, 1) << "\n";
             }
-
-            const double outfile_finish_time = gettime();
-            total_outfile_time += outfile_finish_time - outfile_start_time;
           }
         }
       }
     }
-
-    CCTK_VINFO("Total Outfile time: %g;\n", total_outfile_time);
   }
   if (output_hdf5 && CCTK_MyProc(cctkGH) == 0) {
     OutputComplexToH5File(CCTK_PASS_CTOC, vars, radii, modes);
