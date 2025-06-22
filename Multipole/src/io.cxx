@@ -103,7 +103,8 @@ FILE *OpenOutputFile(CCTK_ARGUMENTS, const std::string &name) {
 
 void OutputComplexToFile(CCTK_ARGUMENTS, const string &name, CCTK_REAL redata,
                          CCTK_REAL imdata, double &total_openfile_time,
-                         double &total_print_time) {
+                         double &total_print_time,
+                         double &total_closefile_time) {
   DECLARE_CCTK_ARGUMENTS;
 
   const double openfile_start_time = gettime();
@@ -117,7 +118,10 @@ void OutputComplexToFile(CCTK_ARGUMENTS, const string &name, CCTK_REAL redata,
     const double print_finish_time = gettime();
     total_print_time += print_finish_time - print_start_time;
 
+    const double closefile_start_time = gettime();
     fclose(fp);
+    const double closefile_finish_time = gettime();
+    total_closefile_time += closefile_finish_time - closefile_start_time;
   }
 }
 
