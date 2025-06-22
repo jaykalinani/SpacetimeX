@@ -10,6 +10,8 @@
 #include <string.h>
 #include <sys/stat.h> // for mkdir
 
+#include <sys/time.h>
+
 #include <cctk_Parameters.h>
 
 // We currently support the HDF5 1.6 API (and when using 1.8 the
@@ -38,6 +40,14 @@
 
 namespace Multipole {
 using namespace std;
+
+namespace {
+double gettime() {
+  timeval tv;
+  gettimeofday(&tv, nullptr);
+  return tv.tv_sec + tv.tv_usec / 1.0e+6;
+}
+} // namespace
 
 static bool file_exists(const string &name) {
   struct stat sts;
@@ -92,11 +102,21 @@ FILE *OpenOutputFile(CCTK_ARGUMENTS, const std::string &name) {
 }
 
 void OutputComplexToFile(CCTK_ARGUMENTS, const string &name, CCTK_REAL redata,
-                         CCTK_REAL imdata) {
+                         CCTK_REAL imdata, double &total_openfile_time,
+                         double &total_print_time) {
   DECLARE_CCTK_ARGUMENTS;
 
-  if (FILE *fp = OpenOutputFile(CCTK_PASS_CTOC, name)) {
+  const double openfile_start_time = gettime();
+  FILE *fp = OpenOutputFile(CCTK_PASS_CTOC, name);
+  const double openfile_finish_time = gettime();
+  total_openfile_time += openfile_finish_time - openfile_start_time;
+
+  if (fp) {
+    const double print_start_time = gettime();
     fprintf(fp, "%f %.19g %.19g\n", cctk_time, redata, imdata);
+    const double print_finish_time = gettime();
+    total_print_time += print_finish_time - print_start_time;
+
     fclose(fp);
   }
 }
