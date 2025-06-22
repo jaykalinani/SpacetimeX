@@ -1,5 +1,5 @@
-#include "io.hxx"
 #include "multipole.hxx"
+#include "io.hxx"
 #include "surface.hxx"
 
 #include <assert.h>
@@ -20,6 +20,7 @@ static Sphere *g_sphere = nullptr;
 // Parsed variables
 static vector<VariableParse> g_vars;
 static vector<int> g_spin_weights;
+static std::unordered_map<std::string, std::ofstream> file_streams;
 
 // Function to output modes
 static void outputModes(CCTK_ARGUMENTS, const VariableParse vars[],
@@ -37,8 +38,37 @@ static void outputModes(CCTK_ARGUMENTS, const VariableParse vars[],
             fileName << "mp_" << vars[v].name << "_l" << l << "_m" << m << "_r"
                      << std::fixed << std::setprecision(2) << rad << ".tsv";
 
-            OutputComplexToFile(CCTK_PASS_CTOC, fileName.str(),
-                                modes(v, i, l, m, 0), modes(v, i, l, m, 1));
+            std::string name = fileName.str();
+
+            // Open file stream if not already open
+            if (file_streams.find(name) == file_streams.end()) {
+              const char *outputDir =
+                  strcmp(out_dir, "") ? out_dir : io_out_dir;
+              const int err = CCTK_CreateDirectory(0755, outputDir);
+              if (err < 0) {
+                CCTK_VWarn(CCTK_WARN_ABORT, __LINE__, __FILE__,
+                           CCTK_THORNSTRING,
+                           "Multipole output directory %s could not be created "
+                           "(error code %d)",
+                           outputDir, err);
+              }
+              std::string outputName = std::string(outputDir) + "/" + name;
+              file_streams[name].open(outputName, cctk_iteration == 0
+                                                      ? std::ios::out
+                                                      : std::ios::app);
+              if (!file_streams[name].is_open()) {
+                CCTK_VWarn(1, __LINE__, __FILE__, CCTK_THORNSTRING,
+                           "Could not open output file %s", outputName.c_str());
+              }
+            }
+
+            // Write to the file stream
+            if (file_streams[name].is_open()) {
+              file_streams[name] << cctk_time << " " << std::scientific
+                                 << std::setprecision(19)
+                                 << modes(v, i, l, m, 0) << " "
+                                 << modes(v, i, l, m, 1) << "\n";
+            }
           }
         }
       }
@@ -118,6 +148,14 @@ extern "C" void Multipole_Setup(CCTK_ARGUMENTS) {
 extern "C" void Multipole_Finalize(CCTK_ARGUMENTS) {
   delete g_sphere;
   g_sphere = nullptr;
+
+  // Close all file streams
+  for (auto &[name, stream] : file_streams) {
+    if (stream.is_open()) {
+      stream.close();
+    }
+  }
+  file_streams.clear(); // Explicitly clear the map
 }
 
 // This is the main scheduling file.  Because we are completely local here
