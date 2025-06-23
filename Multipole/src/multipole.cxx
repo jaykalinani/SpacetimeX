@@ -28,16 +28,16 @@ static void outputModes(CCTK_ARGUMENTS, const VariableParse vars[],
   DECLARE_CCTK_ARGUMENTS;
   DECLARE_CCTK_PARAMETERS;
 
+  std::ostringstream fileName; // Reuse ostringstream
   if (output_tsv && CCTK_MyProc(cctkGH) == 0) {
     for (int v = 0; v < modes.getNumVars(); ++v) {
       for (int i = 0; i < modes.getNumRadii(); ++i) {
         const CCTK_REAL rad = radii[i];
         for (int l = 0; l <= modes.getMaxL(); ++l) {
           for (int m = -l; m <= l; ++m) {
-            std::ostringstream fileName;
+            fileName.str(""); // Clear ostringstream
             fileName << "mp_" << vars[v].name << "_l" << l << "_m" << m << "_r"
                      << std::fixed << std::setprecision(2) << rad << ".tsv";
-
             std::string name = fileName.str();
 
             // Open file stream if not already open
@@ -71,6 +71,12 @@ static void outputModes(CCTK_ARGUMENTS, const VariableParse vars[],
             }
           }
         }
+      }
+    }
+
+    for (auto &[name, stream] : file_streams) {
+      if (stream.is_open()) {
+        stream.flush();
       }
     }
   }
