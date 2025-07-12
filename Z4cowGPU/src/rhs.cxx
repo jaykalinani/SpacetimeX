@@ -2,19 +2,19 @@
 #include <cctk_Arguments.h>
 #include <cctk_Parameters.h>
 #include <loop_device.hxx>
-#include <stx_utils.hxx>
+#include <cx_utils.hxx>
 
 #include <cmath>
 
-#include <stx_derivsGF3D5.hxx>
-#include <stx_derivsinline.hxx>
-#include <stx_dissinline.hxx>
-#include <stx_powerinline.hxx>
+#include <cx_derivsGF3D5.hxx>
+#include <cx_derivsinline.hxx>
+#include <cx_dissinline.hxx>
+#include <cx_powerinline.hxx>
 
 namespace Z4cowGPU {
 using namespace Arith;
 using namespace Loop;
-using namespace STXUtils;
+using namespace CXUtils;
 
 extern "C" void Z4cowGPU_RHS(CCTK_ARGUMENTS) {
   DECLARE_CCTK_ARGUMENTS_Z4cowGPU_RHS;
@@ -92,8 +92,8 @@ extern "C" void Z4cowGPU_RHS(CCTK_ARGUMENTS) {
     // Tile variables for derivatives and so on
     const int ntmps = 132;
     int itmp = 0;
-    const GF3D5layout layout5 = STXUtils::get_GF3D5layout<0, 0, 0>(cctkGH);
-    STXUtils::GF3D5Factory<CCTK_REAL> fct(layout5, ntmps, itmp);
+    const GF3D5layout layout5 = CXUtils::get_GF3D5layout<0, 0, 0>(cctkGH);
+    CXUtils::GF3D5Factory<CCTK_REAL> fct(layout5, ntmps, itmp);
 
     const auto tl_dW = fct.make_vec_gf();
     const auto tl_ddW = fct.make_smat_gf();

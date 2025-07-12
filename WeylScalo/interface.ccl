@@ -15,6 +15,12 @@ USES INCLUDE HEADER: sum.hxx
 USES INCLUDE HEADER: vec.hxx
 USES INCLUDE HEADER: vect.hxx
 
+USES INCLUDE HEADER: cx_utils.hxx
+USES INCLUDE HEADER: cx_derivsGF3D5.hxx
+USES INCLUDE HEADER: cx_derivsinline.hxx
+USES INCLUDE HEADER: cx_dissinline.hxx
+USES INCLUDE HEADER: cx_powerinline.hxx
+
 CCTK_REAL Psi4r_group TYPE=gf TAGS='checkpoint="no"'
 {
   Psi4r

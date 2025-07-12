@@ -4,12 +4,12 @@
 
 #include <cmath>
 
-#include <stx_powerinline.hxx>
+#include <cx_powerinline.hxx>
 
 namespace Z4cowGPU {
 using namespace Arith;
 using namespace Loop;
-using namespace STXUtils;
+using namespace CXUtils;
 
 extern "C" void Z4cowGPU_Initial1(CCTK_ARGUMENTS) {
   DECLARE_CCTK_ARGUMENTS_Z4cowGPU_Initial1;

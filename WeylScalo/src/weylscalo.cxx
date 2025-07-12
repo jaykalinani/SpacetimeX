@@ -2,19 +2,19 @@
 #include <cctk_Arguments.h>
 #include <cctk_Parameters.h>
 #include <loop_device.hxx>
-#include <stx_utils.hxx>
+#include <cx_utils.hxx>
 
 #include <cmath>
 
-#include <stx_derivsGF3D5.hxx>
-#include <stx_derivsinline.hxx>
-#include <stx_dissinline.hxx>
-#include <stx_powerinline.hxx>
+#include <cx_derivsGF3D5.hxx>
+#include <cx_derivsinline.hxx>
+#include <cx_dissinline.hxx>
+#include <cx_powerinline.hxx>
 
 namespace WeylScalo {
 using namespace Arith;
 using namespace Loop;
-using namespace STXUtils;
+using namespace CXUtils;
 
 CCTK_DEVICE CCTK_HOST constexpr CCTK_REAL Sqrt(CCTK_REAL x) {
   return std::sqrt(x);
@@ -70,8 +70,8 @@ extern "C" void WeylScalo_calc_psi4(CCTK_ARGUMENTS) {
     // Tile variables for derivatives and so on
     const int ntmps = 72;
     int itmp = 0;
-    const GF3D5layout layout5 = STXUtils::get_GF3D5layout<0, 0, 0>(cctkGH);
-    STXUtils::GF3D5Factory<CCTK_REAL> fct(layout5, ntmps, itmp);
+    const GF3D5layout layout5 = CXUtils::get_GF3D5layout<0, 0, 0>(cctkGH);
+    CXUtils::GF3D5Factory<CCTK_REAL> fct(layout5, ntmps, itmp);
 
     const auto tl_dgam = fct.make_smat_vec_gf();
     const auto tl_ddgam = fct.make_smat_smat_gf();
