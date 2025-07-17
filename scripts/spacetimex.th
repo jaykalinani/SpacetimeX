@@ -179,7 +179,7 @@ CarpetXUtils/CXUtils
 #SpacetimeX/AHFinderX
 SpacetimeX/BrillLindquist
 SpacetimeX/Cowling
-#SpacetimeX/Multipole
+SpacetimeX/Multipole
 SpacetimeX/NewRadX
 SpacetimeX/TestNewRadX
 #SpacetimeX/Punctures
@@ -190,6 +190,6 @@ SpacetimeX/SphericalSurface
 SpacetimeX/TwoPuncturesX
 #SpacetimeX/Weyl
 SpacetimeX/WeylScalo
-#SpacetimeX/Z4c
-#SpacetimeX/Z4cow
+SpacetimeX/Z4c
+SpacetimeX/Z4cow
 SpacetimeX/Z4cowGPU
