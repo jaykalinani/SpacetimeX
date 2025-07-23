@@ -4,15 +4,15 @@
 #ifndef Z4COWGPU_INITIAL2_HXX
 #define Z4COWGPU_INITIAL2_HXX
 
-const auto &trGt1 = gf_trGt[0];
-const auto &trGt2 = gf_trGt[1];
-const auto &trGt3 = gf_trGt[2];
-const auto &gamt11 = gf_gamt[0];
-const auto &gamt12 = gf_gamt[1];
-const auto &gamt13 = gf_gamt[2];
-const auto &gamt22 = gf_gamt[3];
-const auto &gamt23 = gf_gamt[4];
-const auto &gamt33 = gf_gamt[5];
+const auto trGt1 = gf_trGt[0];
+const auto trGt2 = gf_trGt[1];
+const auto trGt3 = gf_trGt[2];
+const auto gamt11 = gf_gamt[0];
+const auto gamt12 = gf_gamt[1];
+const auto gamt13 = gf_gamt[2];
+const auto gamt22 = gf_gamt[3];
+const auto gamt23 = gf_gamt[4];
+const auto gamt33 = gf_gamt[5];
 
 noinline([&]() __attribute__((__flatten__, __hot__)) {
 grid.loop_int_device<0, 0, 0>(

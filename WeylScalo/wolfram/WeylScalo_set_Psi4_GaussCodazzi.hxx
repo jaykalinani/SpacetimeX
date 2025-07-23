@@ -4,14 +4,14 @@
 #ifndef WEYLSCALO_SET_PSI4_GAUSSCODAZZI_HXX
 #define WEYLSCALO_SET_PSI4_GAUSSCODAZZI_HXX
 
-const auto &Psi4real = gf_Psi4real;
-const auto &Psi4imag = gf_Psi4imag;
-const auto &exK11 = gf_exK[0];
-const auto &exK12 = gf_exK[1];
-const auto &exK13 = gf_exK[2];
-const auto &exK22 = gf_exK[3];
-const auto &exK23 = gf_exK[4];
-const auto &exK33 = gf_exK[5];
+const auto Psi4real = gf_Psi4real;
+const auto Psi4imag = gf_Psi4imag;
+const auto exK11 = gf_exK[0];
+const auto exK12 = gf_exK[1];
+const auto exK13 = gf_exK[2];
+const auto exK22 = gf_exK[3];
+const auto exK23 = gf_exK[4];
+const auto exK33 = gf_exK[5];
 const auto &gam11 = gf_gam[0];
 const auto &gam12 = gf_gam[1];
 const auto &gam13 = gf_gam[2];

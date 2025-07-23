@@ -4,19 +4,19 @@
 #ifndef Z4COWGPU_ENFORCE_HXX
 #define Z4COWGPU_ENFORCE_HXX
 
-const auto &gamt11 = gf_gamt[0];
-const auto &gamt12 = gf_gamt[1];
-const auto &gamt13 = gf_gamt[2];
-const auto &gamt22 = gf_gamt[3];
-const auto &gamt23 = gf_gamt[4];
-const auto &gamt33 = gf_gamt[5];
-const auto &exAt11 = gf_exAt[0];
-const auto &exAt12 = gf_exAt[1];
-const auto &exAt13 = gf_exAt[2];
-const auto &exAt22 = gf_exAt[3];
-const auto &exAt23 = gf_exAt[4];
-const auto &exAt33 = gf_exAt[5];
-const auto &alpha = gf_alpha;
+const auto gamt11 = gf_gamt[0];
+const auto gamt12 = gf_gamt[1];
+const auto gamt13 = gf_gamt[2];
+const auto gamt22 = gf_gamt[3];
+const auto gamt23 = gf_gamt[4];
+const auto gamt33 = gf_gamt[5];
+const auto exAt11 = gf_exAt[0];
+const auto exAt12 = gf_exAt[1];
+const auto exAt13 = gf_exAt[2];
+const auto exAt22 = gf_exAt[3];
+const auto exAt23 = gf_exAt[4];
+const auto exAt33 = gf_exAt[5];
+const auto alpha = gf_alpha;
 
 noinline([&]() __attribute__((__flatten__, __hot__)) {
 grid.loop_all_device<0, 0, 0>(

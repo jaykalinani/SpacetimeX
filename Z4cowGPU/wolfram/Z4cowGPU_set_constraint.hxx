@@ -4,41 +4,41 @@
 #ifndef Z4COWGPU_SET_CONSTRAINT_HXX
 #define Z4COWGPU_SET_CONSTRAINT_HXX
 
-const auto &ZtC1 = gf_ZtC[0];
-const auto &ZtC2 = gf_ZtC[1];
-const auto &ZtC3 = gf_ZtC[2];
-const auto &MtC1 = gf_MtC[0];
-const auto &MtC2 = gf_MtC[1];
-const auto &MtC3 = gf_MtC[2];
-const auto &eTt1 = gf_eTt[0];
-const auto &eTt2 = gf_eTt[1];
-const auto &eTt3 = gf_eTt[2];
-const auto &eT11 = gf_eT[0];
-const auto &eT12 = gf_eT[1];
-const auto &eT13 = gf_eT[2];
-const auto &eT22 = gf_eT[3];
-const auto &eT23 = gf_eT[4];
-const auto &eT33 = gf_eT[5];
-const auto &gamt11 = gf_gamt[0];
-const auto &gamt12 = gf_gamt[1];
-const auto &gamt13 = gf_gamt[2];
-const auto &gamt22 = gf_gamt[3];
-const auto &gamt23 = gf_gamt[4];
-const auto &gamt33 = gf_gamt[5];
-const auto &exKh = gf_exKh;
-const auto &exAt11 = gf_exAt[0];
-const auto &exAt12 = gf_exAt[1];
-const auto &exAt13 = gf_exAt[2];
-const auto &exAt22 = gf_exAt[3];
-const auto &exAt23 = gf_exAt[4];
-const auto &exAt33 = gf_exAt[5];
-const auto &trGt1 = gf_trGt[0];
-const auto &trGt2 = gf_trGt[1];
-const auto &trGt3 = gf_trGt[2];
-const auto &alpha = gf_alpha;
-const auto &beta1 = gf_beta[0];
-const auto &beta2 = gf_beta[1];
-const auto &beta3 = gf_beta[2];
+const auto ZtC1 = gf_ZtC[0];
+const auto ZtC2 = gf_ZtC[1];
+const auto ZtC3 = gf_ZtC[2];
+const auto MtC1 = gf_MtC[0];
+const auto MtC2 = gf_MtC[1];
+const auto MtC3 = gf_MtC[2];
+const auto eTt1 = gf_eTt[0];
+const auto eTt2 = gf_eTt[1];
+const auto eTt3 = gf_eTt[2];
+const auto eT11 = gf_eT[0];
+const auto eT12 = gf_eT[1];
+const auto eT13 = gf_eT[2];
+const auto eT22 = gf_eT[3];
+const auto eT23 = gf_eT[4];
+const auto eT33 = gf_eT[5];
+const auto gamt11 = gf_gamt[0];
+const auto gamt12 = gf_gamt[1];
+const auto gamt13 = gf_gamt[2];
+const auto gamt22 = gf_gamt[3];
+const auto gamt23 = gf_gamt[4];
+const auto gamt33 = gf_gamt[5];
+const auto exKh = gf_exKh;
+const auto exAt11 = gf_exAt[0];
+const auto exAt12 = gf_exAt[1];
+const auto exAt13 = gf_exAt[2];
+const auto exAt22 = gf_exAt[3];
+const auto exAt23 = gf_exAt[4];
+const auto exAt33 = gf_exAt[5];
+const auto trGt1 = gf_trGt[0];
+const auto trGt2 = gf_trGt[1];
+const auto trGt3 = gf_trGt[2];
+const auto alpha = gf_alpha;
+const auto beta1 = gf_beta[0];
+const auto beta2 = gf_beta[1];
+const auto beta3 = gf_beta[2];
 
 noinline([&]() __attribute__((__flatten__, __hot__)) {
 grid.loop_int_device<0, 0, 0>(
