@@ -22,6 +22,7 @@ Cactus::cctk_itlast = 4
 
 CarpetX::verbose = no
 CarpetX::poison_undefined_values = yes
+CarpetX::poison_undefined_arrays = no
 
 CarpetX::xmin = -20.0
 CarpetX::ymin = -20.0
