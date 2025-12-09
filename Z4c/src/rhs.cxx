@@ -355,4 +355,8 @@ extern "C" void Z4c_RHS(CCTK_ARGUMENTS) {
     apply_upwind_diss(cctkGH, gf_betaG1(a), gf_betaG1, gf_betaG_rhs1(a));
 }
 
+extern "C" void Z4c_Sync(CCTK_ARGUMENTS) {
+  // do nothing
+}
+
 } // namespace Z4c

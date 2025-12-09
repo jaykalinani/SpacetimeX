@@ -68,6 +68,67 @@ if(use_subcycling_wip) {
   STORAGE: Theta_k4
   STORAGE: alphaG_k4
   STORAGE: betaG_k4
+
+  SCHEDULE Z4c_Enforce IN ODESolvers_PostSubStep
+  {
+    LANG: C
+    READS: chi(everywhere)
+    READS: gamma_tilde(everywhere)
+    READS: A_tilde(everywhere)
+    READS: alphaG(everywhere)
+    WRITES: chi(everywhere)
+    WRITES: gamma_tilde(everywhere)
+    WRITES: A_tilde(everywhere)
+    WRITES: alphaG(everywhere)
+  } "Enforce algebraic Z4c constraints"
+
+  if (calc_ADM_vars) {
+    SCHEDULE Z4c_ADM IN ODESolvers_PostSubStep AFTER Z4c_Enforce
+    {
+      LANG: C
+      READS: chi(everywhere)
+      READS: gamma_tilde(everywhere)
+      READS: K_hat(everywhere)
+      READS: A_tilde(everywhere)
+      READS: Gam_tilde(everywhere)
+      READS: Theta(everywhere)
+      READS: alphaG(everywhere)
+      READS: betaG(everywhere)
+      # READS: TmunuBaseX::eTtt(interior)
+      # READS: TmunuBaseX::eTti(interior)
+      # READS: TmunuBaseX::eTij(interior)
+      WRITES: ADMBaseX::metric(everywhere)
+      WRITES: ADMBaseX::curv(everywhere)
+      WRITES: ADMBaseX::lapse(everywhere)
+      WRITES: ADMBaseX::dtlapse(everywhere)
+      WRITES: ADMBaseX::shift(everywhere)
+      WRITES: ADMBaseX::dtshift(everywhere)
+    } "Convert Z4c to ADM variables"
+  }
+
+  if (calc_ADMRHS_vars) {
+    SCHEDULE Z4c_ADM2 IN ODESolvers_PostSubStep AFTER Z4c_ADM
+    {
+      LANG: C
+      READS: chi(everywhere)
+      READS: gamma_tilde(everywhere)
+      READS: K_hat(everywhere)
+      READS: A_tilde(everywhere)
+      READS: Gam_tilde(everywhere)
+      READS: Theta(everywhere)
+      READS: alphaG(everywhere)
+      READS: betaG(everywhere)
+      READS: TmunuBaseX::eTtt(interior)
+      READS: TmunuBaseX::eTti(interior)
+      READS: TmunuBaseX::eTij(interior)
+      WRITES: ADMBaseX::dtcurv(interior)
+      WRITES: ADMBaseX::dt2lapse(interior)
+      WRITES: ADMBaseX::dt2shift(interior)
+      SYNC: ADMBaseX::dtcurv
+      SYNC: ADMBaseX::dt2lapse
+      SYNC: ADMBaseX::dt2shift
+    } "Calculate second time derivatives of ADM variables"
+  }
 }
 
 
@@ -171,19 +232,10 @@ SCHEDULE Z4c_Initial2 IN Z4c_InitialGroup AFTER Z4c_Initial1
   # SYNC: Gam_tilde
 } "Convert ADM to Z4c variables, part 2"
 
-
-
-SCHEDULE Z4c_Enforce IN Z4c_PostStepGroup
+SCHEDULE Z4c_Sync IN Z4c_PostStepGroup
 {
   LANG: C
-  READS: chi(interior)
-  READS: gamma_tilde(interior)
-  READS: A_tilde(interior)
-  READS: alphaG(interior)
-  WRITES: chi(interior)
-  WRITES: gamma_tilde(interior)
-  WRITES: A_tilde(interior)
-  WRITES: alphaG(interior)
+  OPTIONS: global
   SYNC: chi
   SYNC: gamma_tilde
   SYNC: K_hat
@@ -192,6 +244,19 @@ SCHEDULE Z4c_Enforce IN Z4c_PostStepGroup
   SYNC: Theta
   SYNC: alphaG
   SYNC: betaG
+} "Synchronize"
+
+SCHEDULE Z4c_Enforce IN Z4c_PostStepGroup AFTER Z4c_Sync
+{
+  LANG: C
+  READS: chi(everywhere)
+  READS: gamma_tilde(everywhere)
+  READS: A_tilde(everywhere)
+  READS: alphaG(everywhere)
+  WRITES: chi(everywhere)
+  WRITES: gamma_tilde(everywhere)
+  WRITES: A_tilde(everywhere)
+  WRITES: alphaG(everywhere)
 } "Enforce algebraic Z4c constraints"
 
 if (calc_ADM_vars) {
