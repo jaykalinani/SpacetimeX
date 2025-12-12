@@ -224,9 +224,17 @@ extern "C" void Z4c_RHS(CCTK_ARGUMENTS) {
           const GF3D2index index1(layout1, p.I);
           const GF3D5index index0(layout0, p.I);
 
+          // Taper eta to zero at the outer boundary to ensure stability
+          const CCTK_REAL r2 = p.x * p.x + p.y * p.y + p.z * p.z;
+          const CCTK_REAL r4 = r2 * r2;
+          const CCTK_REAL is4 =
+              1.0 / (veta_width * veta_width * veta_width * veta_width);
+          const CCTK_REAL eta_local =
+              (veta_central - veta_outer) * exp(-r4 * is4) + veta_outer;
+
           // Load and calculate
           const z4c_vars<vreal> vars(
-              set_Theta_zero, kappa1, kappa2, f_mu_L, f_mu_S, eta, //
+              set_Theta_zero, kappa1, kappa2, f_mu_L, f_mu_S, eta_local, //
               gf_chi0(mask, index0), gf_dchi0(mask, index0),
               gf_ddchi0(mask, index0), //
               gf_gammat0(mask, index0), gf_dgammat0(mask, index0),
