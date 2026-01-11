@@ -83,7 +83,7 @@ SetMainPrint[
   pr[];
 
   (* gamt *)
-  PrintEquations[{Mode -> "Main"}, Take[EvolVarlist, {2}]];
+  PrintEquations[{Mode -> "MainOut"}, Take[EvolVarlist, {2}]];
   pr[];
 
   (* invgamt *)
@@ -93,7 +93,7 @@ SetMainPrint[
   pr[];
 
   (* exAt *)
-  PrintEquations[{Mode -> "Main"}, Take[EvolVarlist, {4}]];
+  PrintEquations[{Mode -> "MainOut"}, Take[EvolVarlist, {4}]];
   pr[];
 
   pr["});"];

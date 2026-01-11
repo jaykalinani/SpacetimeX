@@ -56,7 +56,7 @@ SetMainPrint[
   pr["const int ijk = layout2.linear(p.i, p.j, p.k);"];
   pr[];
 
-  PrintEquations[{Mode -> "Main"}, ADMVarlist];
+  PrintEquations[{Mode -> "MainOut"}, ADMVarlist];
   pr[];
 
   pr["});"];

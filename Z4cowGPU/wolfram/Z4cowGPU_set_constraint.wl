@@ -76,7 +76,7 @@ SetMainPrint[
   PrintEquations[{Mode -> "Temp"}, dAtUUVarlist];
   pr[];
 
-  PrintEquations[{Mode -> "Main"}, ConstraintVarlist];
+  PrintEquations[{Mode -> "MainOut"}, ConstraintVarlist];
   pr[];
 
   pr["});"];

@@ -77,7 +77,7 @@ SetMainPrint[
   pr[];
 
   (* trGt *)
-  PrintEquations[{Mode -> "Main"}, Take[EvolVarlist, {5}]];
+  PrintEquations[{Mode -> "MainOut"}, Take[EvolVarlist, {5}]];
   pr[];
 
   pr["});"];

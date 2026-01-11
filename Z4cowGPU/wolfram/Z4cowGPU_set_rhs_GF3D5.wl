@@ -82,7 +82,7 @@ SetMainPrint[
   PrintEquations[{Mode -> "Temp"}, MatterVarlist];
   pr[];
 
-  PrintEquations[{Mode -> "Main"}, dtEvolVarlist];
+  PrintEquations[{Mode -> "MainOut"}, dtEvolVarlist];
   pr[];
 
   pr["});"];
