@@ -73,7 +73,7 @@ SetMainPrint[
   pr[];
 
   (* W, gamt, exKh, exAt, Theta, alpha, beta *)
-  PrintEquations[{Mode -> "Main"}, Drop[EvolVarlist, {5}]];
+  PrintEquations[{Mode -> "MainOut"}, Drop[EvolVarlist, {5}]];
   pr[];
 
   pr["});"];
