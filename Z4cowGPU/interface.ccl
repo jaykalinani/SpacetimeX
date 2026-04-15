@@ -31,14 +31,14 @@ REQUIRES FUNCTION GetCallFunctionCount
 
 # All variables have been shifted so that they tend to zero in flat space
 
-CCTK_REAL W TYPE=gf TAGS='rhs="W_rhs" dependents="ADMBaseX::metric"' "W"
-CCTK_REAL gamma_tilde TYPE=gf TAGS='parities={+1 +1 +1   -1 -1 +1   -1 +1 -1   +1 +1 +1   +1 -1 -1   +1 +1 +1} rhs="gamma_tilde_rhs" dependents="ADMBaseX::metric"' { gammatxx gammatxy gammatxz gammatyy gammatyz gammatzz } "gamma-tilde"
-CCTK_REAL K_hat TYPE=gf TAGS='rhs="K_hat_rhs" dependents="ADMBaseX::curv"' { Kh } "K-hat"
-CCTK_REAL A_tilde TYPE=gf TAGS='parities={+1 +1 +1   -1 -1 +1   -1 +1 -1   +1 +1 +1   +1 -1 -1   +1 +1 +1} rhs="A_tilde_rhs" dependents="ADMBaseX::curv"' { Atxx Atxy Atxz Atyy Atyz Atzz } "A-tilde"
-CCTK_REAL Gam_tilde TYPE=gf TAGS='parities={-1 +1 +1   +1 -1 +1   +1 +1 -1} rhs="Gam_tilde_rhs"' { Gamtx Gamty Gamtz } "Gamma-tilde"
-CCTK_REAL Theta TYPE=gf TAGS='rhs="Theta_rhs" dependents="ADMBaseX::curv"' "Theta"
-CCTK_REAL alphaG TYPE=gf TAGS='rhs="alphaG_rhs" dependents="ADMBaseX::lapse ADMBaseX::dtlapse"' "alpha"
-CCTK_REAL betaG TYPE=gf TAGS='parities={-1 +1 +1   +1 -1 +1   +1 +1 -1} rhs="betaG_rhs" dependents="ADMBaseX::shift ADMBaseX::dtshift"' { betaGx betaGy betaGz } "beta"
+CCTK_REAL W TYPE=gf TAGS='rhs="W_rhs" old="W_old" ks="W_k1 W_k2 W_k3 W_k4" dependents="ADMBaseX::metric"' "W"
+CCTK_REAL gamma_tilde TYPE=gf TAGS='parities={+1 +1 +1   -1 -1 +1   -1 +1 -1   +1 +1 +1   +1 -1 -1   +1 +1 +1} rhs="gamma_tilde_rhs" old="gamma_tilde_old" ks="gamma_tilde_k1 gamma_tilde_k2 gamma_tilde_k3 gamma_tilde_k4" dependents="ADMBaseX::metric"' { gammatxx gammatxy gammatxz gammatyy gammatyz gammatzz } "gamma-tilde"
+CCTK_REAL K_hat TYPE=gf TAGS='rhs="K_hat_rhs" old="K_hat_old" ks="K_hat_k1 K_hat_k2 K_hat_k3 K_hat_k4" dependents="ADMBaseX::curv"' { Kh } "K-hat"
+CCTK_REAL A_tilde TYPE=gf TAGS='parities={+1 +1 +1   -1 -1 +1   -1 +1 -1   +1 +1 +1   +1 -1 -1   +1 +1 +1} rhs="A_tilde_rhs" old="A_tilde_old" ks="A_tilde_k1 A_tilde_k2 A_tilde_k3 A_tilde_k4" dependents="ADMBaseX::curv"' { Atxx Atxy Atxz Atyy Atyz Atzz } "A-tilde"
+CCTK_REAL Gam_tilde TYPE=gf TAGS='parities={-1 +1 +1   +1 -1 +1   +1 +1 -1} rhs="Gam_tilde_rhs" old="Gam_tilde_old" ks="Gam_tilde_k1 Gam_tilde_k2 Gam_tilde_k3 Gam_tilde_k4"' { Gamtx Gamty Gamtz } "Gamma-tilde"
+CCTK_REAL Theta TYPE=gf TAGS='rhs="Theta_rhs" old="Theta_old" ks="Theta_k1 Theta_k2 Theta_k3 Theta_k4" dependents="ADMBaseX::curv"' "Theta"
+CCTK_REAL alphaG TYPE=gf TAGS='rhs="alphaG_rhs" old="alphaG_old" ks="alphaG_k1 alphaG_k2 alphaG_k3 alphaG_k4" dependents="ADMBaseX::lapse ADMBaseX::dtlapse"' "alpha"
+CCTK_REAL betaG TYPE=gf TAGS='parities={-1 +1 +1   +1 -1 +1   +1 +1 -1} rhs="betaG_rhs" old="betaG_old" ks="betaG_k1 betaG_k2 betaG_k3 betaG_k4" dependents="ADMBaseX::shift ADMBaseX::dtshift"' { betaGx betaGy betaGz } "beta"
 
 
 
