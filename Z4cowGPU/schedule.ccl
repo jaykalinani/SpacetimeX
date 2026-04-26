@@ -182,7 +182,6 @@ SCHEDULE Z4cowGPU_InitialLapse IN Z4cowGPU_InitialGroup AFTER Z4cowGPU_Initial2
   LANG: C
   READS: W(interior)
   WRITES: alphaG(interior)
-  SYNC: alphaG
 } "Set initial lapse"
 
 SCHEDULE Z4cowGPU_Sync IN Z4cowGPU_PostStepGroup
