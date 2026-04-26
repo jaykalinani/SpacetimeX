@@ -66,6 +66,7 @@ BoxInBox::radius_1 = [ -1.0, 10.0 ]
 
 ODESolvers::verbose = no
 ODESolvers::method = "RK4"
+ODESolvers::use_odesolvers_poststep_during_rksubsteps = "no"
 
 ADMBaseX::initial_data  = "TwoPunctures"
 ADMBaseX::initial_lapse = "TwoPunctures-averaged"
