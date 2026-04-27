@@ -6,15 +6,17 @@
 
 ActiveThorns = "
 ADMBaseX
+BoxInBox
 CarpetX
 CoordinatesX
-ErrorEstimator
 IOUtil
 ODESolvers
 TmunuBaseX
 TwoPuncturesX
 Z4c
 "
+
+$nlevels = 2
 
 Cactus::cctk_show_schedule = no
 
@@ -56,15 +58,18 @@ CarpetX::boundary_upper_z = "dirichlet"
 
 CarpetX::ghost_size = 3
 
-CarpetX::max_num_levels = 1
+CarpetX::max_num_levels = $nlevels
 CarpetX::regrid_every = 16
 CarpetX::regrid_error_threshold = 0.03125
 
-ErrorEstimator::region_shape = "cube"
-ErrorEstimator::scale_by_resolution = yes
-
 CarpetX::prolongation_type = "ddf"
 CarpetX::prolongation_order = 5
+
+BoxInBox::num_regions = 1
+# Region 1
+BoxInBox::shape_1 = "cube"
+BoxInBox::num_levels_1 = $nlevels
+BoxInBox::radius_1 = [ -1.0, 10.0 ]
 
 ODESolvers::verbose = no
 ODESolvers::method = "RK4"
