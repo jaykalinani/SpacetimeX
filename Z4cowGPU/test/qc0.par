@@ -83,6 +83,7 @@ TwoPuncturesX::adm_tol    = 1e-6
 TwoPuncturesX::Newton_tol = 1e-6
 TwoPuncturesX::verbose = yes
 
+Z4cowGPU::timelevels       = 1
 Z4cowGPU::calc_ADM_vars    = yes
 #Z4cowGPU::calc_ADMRHS_vars = yes
 #Z4cowGPU::calc_constraints = yes

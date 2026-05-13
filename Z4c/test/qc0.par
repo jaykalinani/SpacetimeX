@@ -89,6 +89,7 @@ TwoPuncturesX::Newton_tol = 1e-6
 
 TwoPuncturesX::verbose = yes
 
+Z4c::timelevels    = 1
 Z4c::calc_ADM_vars = yes             
 Z4c::calc_ADMRHS_vars = yes
 Z4c::calc_constraints = yes

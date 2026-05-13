@@ -1,13 +1,13 @@
 # Schedule definitions for thorn Z4c
 
-STORAGE: chi
-STORAGE: gamma_tilde
-STORAGE: K_hat
-STORAGE: A_tilde
-STORAGE: Gam_tilde
-STORAGE: Theta
-STORAGE: alphaG
-STORAGE: betaG
+STORAGE: chi[timelevels]
+STORAGE: gamma_tilde[timelevels]
+STORAGE: K_hat[timelevels]
+STORAGE: A_tilde[timelevels]
+STORAGE: Gam_tilde[timelevels]
+STORAGE: Theta[timelevels]
+STORAGE: alphaG[timelevels]
+STORAGE: betaG[timelevels]
 
 STORAGE: ZtC
 STORAGE: HC
@@ -23,16 +23,11 @@ STORAGE: Theta_rhs
 STORAGE: alphaG_rhs
 STORAGE: betaG_rhs
 
-if(use_subcycling_wip) {
-  STORAGE: chi_old
-  STORAGE: gamma_tilde_old
-  STORAGE: K_hat_old
-  STORAGE: A_tilde_old
-  STORAGE: Gam_tilde_old
-  STORAGE: Theta_old
-  STORAGE: alphaG_old
-  STORAGE: betaG_old
+STORAGE: ADMBaseX::dtcurv
+STORAGE: ADMBaseX::dt2lapse
+STORAGE: ADMBaseX::dt2shift
 
+if(use_subcycling_wip) {
   STORAGE: chi_k1
   STORAGE: gamma_tilde_k1
   STORAGE: K_hat_k1
