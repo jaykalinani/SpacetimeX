@@ -142,7 +142,7 @@ RESTRICTED:
 CCTK_INT timelevels "Number of time levels for the state" STEERABLE=recover
 {
   0:4 :: ""
-} 2
+} 1
 
 SHARES: Driver
 
