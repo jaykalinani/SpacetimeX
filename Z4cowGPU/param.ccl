@@ -136,6 +136,14 @@ CCTK_INT n_betaG "n power of outgoing boundary r^n fall off rate for beta"
   0:2           :: "1 is my guess"
 } 1
 
+
+RESTRICTED:
+
+CCTK_INT timelevels "Number of time levels for the state" STEERABLE=recover
+{
+  0:4 :: ""
+} 1
+
 SHARES: Driver
 
 USES BOOLEAN use_subcycling_wip

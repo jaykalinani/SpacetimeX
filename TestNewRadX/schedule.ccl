@@ -1,6 +1,6 @@
 # Schedule definitions for thorn TestNewRadX 
 
-STORAGE: state
+STORAGE: state rhs error
 
 SCHEDULE TestNewRadX_Init AT initial
 {

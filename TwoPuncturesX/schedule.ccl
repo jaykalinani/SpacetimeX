@@ -3,10 +3,7 @@
 if (CCTK_Equals(initial_data, "twopunctures"))
 {
   STORAGE: energy, angular_momentum, puncture_adm_mass, bare_mass
-
-  if (keep_u_around) {
-    STORAGE: puncture_u
-  }
+  STORAGE: puncture_u
 
   SCHEDULE TwoPuncturesX_ParamCheck AT paramcheck
   {
@@ -20,7 +17,6 @@ if (CCTK_Equals(initial_data, "twopunctures"))
   SCHEDULE TwoPuncturesX_TwoPunctures IN TwoPuncturesX_Group
   {
     LANG: C
-    STORAGE: puncture_u
     # TODO: these WRITES are conditional on parameters
     READS: CoordinatesX::vertex_coords(everywhere)
     WRITES: ADMBaseX::metric(everywhere)
