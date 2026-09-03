@@ -13,6 +13,28 @@ using namespace std;
 
 namespace {
 template <typename T> constexpr T pow2(const T x) { return x * x; }
+
+// Faces with apply_*=no are treated like symmetry faces so
+// loop_outermost_int skips them. Default apply_*=yes leaves behavior
+// unchanged.
+vect<vect<bool, dim>, 2>
+skip_disabled_faces(vect<vect<bool, dim>, 2> is_sym_bnd, bool apply_x,
+                    bool apply_y, bool apply_z, bool apply_lower_x,
+                    bool apply_upper_x) {
+  if (!apply_x || !apply_lower_x)
+    is_sym_bnd[0][0] = true;
+  if (!apply_x || !apply_upper_x)
+    is_sym_bnd[1][0] = true;
+  if (!apply_y) {
+    is_sym_bnd[0][1] = true;
+    is_sym_bnd[1][1] = true;
+  }
+  if (!apply_z) {
+    is_sym_bnd[0][2] = true;
+    is_sym_bnd[1][2] = true;
+  }
+  return is_sym_bnd;
+}
 } // namespace
 
 // Adapted from NewRad thorn by E. Schnetter, used with Carpet.
@@ -26,6 +48,7 @@ void NewRadX_Apply(const cGH *restrict const cctkGH,
                    const CCTK_REAL radpower //!< exponent in radial fall-off
 ) {
   DECLARE_CCTK_ARGUMENTS;
+  DECLARE_CCTK_PARAMETERS;
 
   constexpr vect<int, dim> DI{1, 0, 0};
   constexpr vect<int, dim> DJ{0, 1, 0};
@@ -111,7 +134,7 @@ void NewRadX_Apply(const cGH *restrict const cctkGH,
   };
 
   const auto symmetries = CarpetX::ghext->patchdata.at(cctk_patch).symmetries;
-  const vect<vect<bool, Loop::dim>, 2> is_sym_bnd {
+  vect<vect<bool, Loop::dim>, 2> is_sym_bnd {
     {
       symmetries[0][0] != CarpetX::symmetry_t::none,
       symmetries[0][1] != CarpetX::symmetry_t::none,
@@ -123,6 +146,8 @@ void NewRadX_Apply(const cGH *restrict const cctkGH,
       symmetries[1][2] != CarpetX::symmetry_t::none
     }
   };
+  is_sym_bnd = skip_disabled_faces(is_sym_bnd, apply_x, apply_y, apply_z,
+                                   apply_lower_x, apply_upper_x);
 
   const Loop::GridDescBaseDevice grid(cctkGH);
   grid.loop_outermost_int_device<0, 0, 0>(
@@ -184,12 +209,22 @@ void NewRadX_Apply(const cGH *restrict const cctkGH,
                                           grid.nghostzones[2] * p.NI[2]};
               vect<int, dim> intp = p.I - displacement;
 
-              assert(intp[0] >= grid.nghostzones[0]);
-              assert(intp[1] >= grid.nghostzones[1]);
-              assert(intp[2] >= grid.nghostzones[2]);
-              assert(intp[0] <= grid.lsh[0] - grid.nghostzones[0] - 1);
-              assert(intp[1] <= grid.lsh[1] - grid.nghostzones[1] - 1);
-              assert(intp[2] <= grid.lsh[2] - grid.nghostzones[2] - 1);
+              // By default, require intp to lie within the group's tagged
+              // interior. require_tagged_interior_for_radpower="no" keeps
+              // only the array-bounds check, for a thin cartoon slab whose
+              // ghost zones are filled by Cartoon2DX.
+              if (require_tagged_interior_for_radpower) {
+                assert(intp[0] >= grid.nghostzones[0]);
+                assert(intp[1] >= grid.nghostzones[1]);
+                assert(intp[2] >= grid.nghostzones[2]);
+                assert(intp[0] <= grid.lsh[0] - grid.nghostzones[0] - 1);
+                assert(intp[1] <= grid.lsh[1] - grid.nghostzones[1] - 1);
+                assert(intp[2] <= grid.lsh[2] - grid.nghostzones[2] - 1);
+              } else {
+                assert(intp[0] >= 0 && intp[0] < grid.lsh[0]);
+                assert(intp[1] >= 0 && intp[1] < grid.lsh[1]);
+                assert(intp[2] >= 0 && intp[2] < grid.lsh[2]);
+              }
 
               // coordinates at p.I-displacement
               const CCTK_REAL xint = p.x - displacement[0] * p.DX[0];
