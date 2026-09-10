@@ -20,6 +20,7 @@
 #include "util_Table.h"
 #include "cctk.h"
 #include "cctk_Arguments.h"
+#include "cctk_Functions.h"
 #include "cctk_Parameters.h"
 
 #include "config.h"
@@ -144,6 +145,16 @@ extern "C"
 {
 DECLARE_CCTK_ARGUMENTS_AHFinderDirect_find_horizons
 DECLARE_CCTK_PARAMETERS
+
+// A spatial interpolation spanning asynchronous AMR levels would require
+// time interpolation, which AHFinderDirect does not provide.
+if (CCTK_IsFunctionAliased("CarpetX_AllLevelsSynchronized")
+    && !CarpetX_AllLevelsSynchronized())
+  {
+  for (int hn = 1; hn <= state.my_hs->N_horizons(); ++hn)
+    state.AH_data_array[hn]->search_flag = false;
+  return;
+  }
 
 // determine whether a horizon should be found at this iteration
 bool find_any = false;
@@ -271,11 +282,12 @@ IO_info.output_mean_curvature
      && ((IO_info.time_iteration % IO_info.output_mean_curvature_every) == 0);
 
 // Set the initial guess for every horizon this process may own.  In dynamic
-// mode all processes hold replicated full state; in static mode retain the
-// original per-process horizon sequence.
+// mode all active processes hold replicated full state; in static mode retain
+// the original per-process horizon sequence.
 	for (int hn = 1 ; hn <= N_horizons ; ++hn)
 	{
-	if (!dynamic_horizon_assignment && !hs.is_hn_genuine(hn))
+	if (!active_flag
+	    || (!dynamic_horizon_assignment && !hs.is_hn_genuine(hn)))
 	   then continue;
 	assert( state.AH_data_array[hn] != NULL );
 	struct AH_data& AH_data = *state.AH_data_array[hn];

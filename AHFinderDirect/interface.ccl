@@ -6,6 +6,9 @@ inherits: CoordinatesX ADMBaseX SphericalSurface IO
 
 USES INCLUDE HEADER: loop_device.hxx
 
+CCTK_INT FUNCTION CarpetX_AllLevelsSynchronized()
+USES FUNCTION CarpetX_AllLevelsSynchronized
+
 # include file provided by SpaceMask
 # USES INCLUDE: SpaceMask.h
 
