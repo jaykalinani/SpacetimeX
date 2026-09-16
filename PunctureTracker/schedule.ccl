@@ -47,7 +47,10 @@ SCHEDULE PunctureTracker_Setup IN PunctureTracker_SetupGroup
   WRITES: pt_group_properties
 } "Calculate initial location of punctures"
 
-SCHEDULE PunctureTracker_Track AT evol AFTER ODESolvers_Solve
+# ODESolvers selects exactly one of these solver routines according to
+# use_subcycling. Keep puncture tracking after the solver active in this
+# CCTK_EVOL traversal.
+SCHEDULE PunctureTracker_Track AT evol AFTER (ODESolvers_Solve, ODESolvers_Solve_Subcycling)
 {
   LANG: C
   OPTIONS: GLOBAL
