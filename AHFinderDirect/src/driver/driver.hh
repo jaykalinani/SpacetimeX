@@ -8,6 +8,8 @@
 //	"BH_diagnostics.hh"
 //
 
+#include <vector>
+
 // everything in this file is inside this namespace
 namespace AHFinderDirect
 	  {
@@ -26,6 +28,21 @@ enum	method
 	method__evaluate_expansions,
 	method__test_expansion_Jacobians,
 	method__find_horizons // no comma
+	};
+
+// Lifecycle of a preallocated apparent-horizon slot. Keep the values stable:
+// they are saved in Cactus checkpoint variables.
+enum horizon_status {
+	horizon_status__unused = 0,
+	horizon_status__individual = 1,
+	horizon_status__candidate = 2,
+	horizon_status__confirmed = 3
+	};
+
+enum candidate_discovery_method {
+	candidate_discovery_method__none = 0,
+	candidate_discovery_method__method1 = 1,
+	candidate_discovery_method__method2 = 2
 	};
 
 //
@@ -333,6 +350,17 @@ struct	AH_data
 
 	bool search_flag;	// did we search for this horizon
 	bool found_flag;	// did we find this horizon (successfully)
+	bool has_been_found;
+	enum horizon_status status;
+	bool inside_confirmed_merger;
+	fp mass;
+	std::vector<int> parent_horizons;
+	enum candidate_discovery_method candidate_method;
+	int candidate_creation_iteration;
+	fp candidate_creation_time;
+	int candidate_failed_searches;
+	int candidate_inactive_checks;
+	bool merger_event_written;
 	bool h_files_written;	// have we written horizon-shape or similar
 				// files for this horizon yet?
 
@@ -364,6 +392,7 @@ struct	state
 	int N_active_procs;		// total number of active processors
 					// (the active processors are processor
 					//  numbers 0 to N_active_procs-1)
+	bool merger_event_file_initialized;
 	bool dynamic_horizon_assignment;
 
 	struct cactus_grid_info cgi;
@@ -397,6 +426,16 @@ struct	state
 
 // setup.cc
 // ... called from Cactus Scheduler
+std::vector<int> canonical_parent_group(const std::vector<int>& parent_horizons);
+bool same_parent_group(const std::vector<int>& parents_a,
+		       const std::vector<int>& parents_b);
+int find_horizon_with_parent_group(const std::vector<int>& parent_horizons);
+int find_unused_horizon_slot();
+void initialize_candidate_slot(CCTK_ARGUMENTS, int candidate_hn,
+	const std::vector<int>& parent_horizons, fp candidate_origin_x,
+	fp candidate_origin_y, fp candidate_origin_z, fp candidate_radius,
+	enum candidate_discovery_method candidate_method);
+void reset_candidate_slot(CCTK_ARGUMENTS, int candidate_hn);
 extern "C"
   void AHFinderDirect_setup(CCTK_ARGUMENTS);
 

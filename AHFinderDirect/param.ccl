@@ -35,8 +35,17 @@ USES STRING out_dir
 # a non-existing one
 shares: SphericalSurface
 USES INT nsurfaces
+USES INT num_extraction_surface
 USES INT maxntheta
 USES INT maxnphi
+
+# Initial individual horizons and their proxy masses come from BHClusterX.
+SHARES: BHClusterX
+USES INT npunctures
+USES REAL mass
+USES REAL posx
+USES REAL posy
+USES REAL posz
 
 # all remaining parameters are private to this thorn
 private:
@@ -46,6 +55,18 @@ private:
 #
 # ***** overall parameters *****
 #
+
+boolean read_from_BHClusterX \
+  "initialize individual horizons from BHClusterX puncture parameters" \
+  STEERABLE=always
+{
+} "true"
+
+boolean AH_set_origins_to_punctures \
+  "recenter each horizon search using tracked punctures and the merger hierarchy" \
+  STEERABLE=always
+{
+} "false"
 
 # set this to (try to) find apparent horizons at every time step
 int find_every "how often should we try to find apparent horizons?" STEERABLE=always
@@ -89,6 +110,99 @@ real dont_find_after_individual_time[101] "when should we stop finding individua
 boolean disable_horizon[101] "should this horizon be disabled?" STEERABLE=always
 {
 } "false"
+
+################################################################################
+#
+# ***** dynamical merger discovery *****
+#
+
+boolean discover_mergers \
+  "dynamically search for new common horizons around nearby confirmed horizons" \
+  STEERABLE=always
+{
+} "true"
+
+int merger_discovery_min_iteration \
+  "first Cactus iteration at which dynamical merger discovery may run" \
+  STEERABLE=always
+{
+0:* :: "any non-negative iteration"
+} 1
+
+real merger_search_factor \
+  "Method #1 search factor in d_ij < 4 merger_search_factor (m_i + m_j)" \
+  STEERABLE=always
+{
+0.0:* :: "any non-negative search factor"
+} 1.0
+
+real merger_pre_factor \
+  "candidate coordinate-sphere radius as a factor times M_tot" \
+  STEERABLE=always
+{
+(0.0:* :: "any positive merger initial-guess factor"
+} 2.0
+
+boolean merger_allow_group_mergers \
+  "Method #1: combine connected nearby pairs into groups of arbitrary size" \
+  STEERABLE=always
+{
+} "true"
+
+boolean merger_search_compact_groups \
+  "also search for compact groups of three or more horizons using Method #2" \
+  STEERABLE=always
+{
+} "false"
+
+real merger_compact_search_factor \
+  "Method #2 search factor in max(d_ij) <= 4 merger_compact_search_factor M_tot" \
+  STEERABLE=always
+{
+0.0:* :: "any non-negative compact-group search factor"
+} 1.0
+
+int merger_compact_max_group_size \
+  "largest group considered by the Method #2 compact-group search" \
+  STEERABLE=always
+{
+3:100 :: "groups contain between three and this many horizons"
+} 100
+
+real merger_enclosing_radius_factor \
+  "require the candidate enclosing radius to be less than 2 factor M_tot" \
+  STEERABLE=always
+{
+0.0:* :: "any non-negative enclosing-radius factor"
+} 1.0
+
+int max_active_merger_candidates \
+  "maximum number of unconverged merger candidates active at once" \
+  STEERABLE=always
+{
+1:100 :: "at least one and no more than the compiled horizon-slot limit"
+} 100
+
+real merger_release_factor \
+  "multiply a candidate's creation-distance threshold by this for release hysteresis" \
+  STEERABLE=always
+{
+1.0:* :: "release distance must be at least the creation distance"
+} 1.25
+
+int merger_release_checks \
+  "number of consecutive failed release checks before discarding a candidate" \
+  STEERABLE=always
+{
+1:* :: "discard after at least one failed check"
+} 3
+
+string merger_event_file_name \
+  "name of the merger-event file in BH_diagnostics_directory" \
+  STEERABLE=recover
+{
+".+" :: "any nonempty file name"
+} "AH_mergers"
 
 #
 # These parameters control which schedule bin (or even bins, if you
@@ -189,7 +303,7 @@ int which_horizon_to_announce_centroid \
 #
 int which_surface_to_store_info[101] \
   "into which surface should we store the info?" \
-  STEERABLE=recover
+  STEERABLE=always
 {
 -1  :: "don't store info"
 0:* :: "store info into the corresponding surface"
@@ -376,7 +490,7 @@ real smoothing_factor[101] "smoothen (remove higher multipole moments) the surfa
 
 keyword initial_guess_method[101] \
   "method used to set up initial guess for apparent horizon shape" \
-  STEERABLE=recover
+  STEERABLE=ALWAYS
 {
 "read from named file"	:: "read from explicitly-named input file"
 "read from h file"	:: \
@@ -432,7 +546,7 @@ real initial_guess__Kerr_Kerr__spin[101] "dimensionless spin a=J/m^2 of Kerr BH"
 } 0.6
 
 # parameters for initial_guess_method = "Kerr/Kerr-Schild"
-real initial_guess__Kerr_KerrSchild__x_posn[101] "x coordinate of Kerr BH" STEERABLE=recover
+real initial_guess__Kerr_KerrSchild__x_posn[101] "x coordinate of Kerr BH" STEERABLE=ALWAYS
 {
 *:* :: "any real number"
 } 0.0
@@ -457,19 +571,19 @@ real initial_guess__Kerr_KerrSchild__spin[101] "dimensionless spin a=J/m^2 of Ke
 } 0.6
 
 # parameters for initial_guess_method = "sphere"
-real initial_guess__coord_sphere__x_center[101] "x coordinate of sphere center" STEERABLE=recover
+real initial_guess__coord_sphere__x_center[101] "x coordinate of sphere center" STEERABLE=ALWAYS
 {
 *:* :: "any real number"
 } 0.0
-real initial_guess__coord_sphere__y_center[101] "y coordinate of sphere center" STEERABLE=recover
+real initial_guess__coord_sphere__y_center[101] "y coordinate of sphere center" STEERABLE=ALWAYS
 {
 *:* :: "any real number"
 } 0.0
-real initial_guess__coord_sphere__z_center[101] "z coordinate of sphere center" STEERABLE=recover
+real initial_guess__coord_sphere__z_center[101] "z coordinate of sphere center" STEERABLE=ALWAYS
 {
 *:* :: "any real number"
 } 0.0
-real initial_guess__coord_sphere__radius[101] "radius of sphere" STEERABLE=recover
+real initial_guess__coord_sphere__radius[101] "radius of sphere" STEERABLE=ALWAYS
 {
 (0.0:* :: "any real number > 0.0"
 } 2.0
@@ -1117,15 +1231,15 @@ int max_allowable_Theta_nonshrink_iterations \
 # of the horizon radius is no problem, and even 1/2 the horizon radius
 # only slows the convergence by an extra iteration or two.
 #
-real origin_x[101] "global x coordinate of patch system origin" STEERABLE=recover
+real origin_x[101] "global x coordinate of patch system origin" STEERABLE=always
 {
 *:* :: "any real number"
 } 0.0
-real origin_y[101] "global y coordinate of patch system origin" STEERABLE=recover
+real origin_y[101] "global y coordinate of patch system origin" STEERABLE=always
 {
 *:* :: "any real number"
 } 0.0
-real origin_z[101] "global z coordinate of patch system origin" STEERABLE=recover
+real origin_z[101] "global z coordinate of patch system origin" STEERABLE=always
 {
 *:* :: "any real number"
 } 0.0
@@ -1166,7 +1280,7 @@ string track_origin_source_z[101] "grid scalar containing the x component of the
 # but alas they don't work yet for apparent horizon finding
 # (the Jacobian computation doesn't yet grok the nonlocal rotation BCs).
 #
-keyword patch_system_type[101] "what type of patch system should we use?"
+keyword patch_system_type[101] "what type of patch system should we use?" STEERABLE=always
 {
 # choose this for normal use
 "match Cactus grid symmetry" :: \
