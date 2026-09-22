@@ -11,6 +11,31 @@ CCTK_INT nsurfaces "Number of surfaces" STEERABLE=recover
   0:100 :: ""
 } 0
 
+CCTK_INT num_extraction_surface "Number of leading slots reserved for extraction surfaces" STEERABLE=recover
+{
+  0:100 :: ""
+} 0
+
+CCTK_INT ntheta_extraction "Theta resolution for extraction surfaces" STEERABLE=recover
+{
+  0:* :: "must be at least 3*nghoststheta and no greater than maxntheta"
+} 19
+
+CCTK_INT nphi_extraction "Phi resolution for extraction surfaces" STEERABLE=recover
+{
+  0:* :: "must be at least 3*nghostsphi and no greater than maxnphi"
+} 38
+
+CCTK_INT ntheta_AH "Theta resolution for apparent-horizon surfaces" STEERABLE=recover
+{
+  0:* :: "must be at least 3*nghoststheta and no greater than maxntheta"
+} 19
+
+CCTK_INT nphi_AH "Phi resolution for apparent-horizon surfaces" STEERABLE=recover
+{
+  0:* :: "must be at least 3*nghostsphi and no greater than maxnphi"
+} 38
+
 # can be queried via SphericalSurface_IdFromName()
 CCTK_STRING name[100] "User friendly name of spherical surface" STEERABLE=always
 {
@@ -31,8 +56,7 @@ CCTK_REAL auto_res_ratio[100] "Multiplicative factor by which we want to scale t
   0:* :: ""
 } 2.0
 
-
-KEYWORD auto_res_grid[100] "Choose resolution according to how grids overlap"
+KEYWORD auto_res_grid[100] "Choose resolution according to how grids overlap"   
 {
   "fully contained" :: "SF must be fully contained in Cartesian grid"
   "overlap"         :: "SF overlaps with grid"

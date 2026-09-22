@@ -2,7 +2,7 @@
 # $Header$
 
 implements: AHFinderDirect
-inherits: CoordinatesX ADMBaseX SphericalSurface IO
+inherits: CoordinatesX ADMBaseX SphericalSurface PunctureTracker IO
 
 USES INCLUDE HEADER: loop_device.hxx
 
@@ -133,6 +133,34 @@ CCTK_REAL ah_flags[N_horizons] TYPE=scalar
   ah_centroid_iteration
   ah_centroid_iteration_p
 }
+
+# Per-slot lifecycle metadata. These are checkpointed so a recovery retains
+# dynamically created common-horizon candidates and their merger tree.
+CCTK_INT ah_lifecycle[N_horizons] TYPE=scalar
+{
+  ah_status
+  ah_has_been_found
+  ah_inside_confirmed_merger
+  ah_candidate_creation_iteration
+  ah_candidate_failed_searches
+  ah_candidate_inactive_checks
+  ah_candidate_parent_count
+  ah_candidate_discovery_method
+  ah_merger_event_written
+}
+
+CCTK_REAL ah_candidate_times[N_horizons] TYPE=scalar
+{
+  ah_candidate_creation_time
+}
+
+CCTK_REAL ah_masses[N_horizons] TYPE=scalar
+{
+  ah_mass
+}
+
+# Flattened as parent + N_horizons * candidate.
+CCTK_INT ah_candidate_parent[N_horizons] TYPE=array DIM=1 SIZE=N_horizons DISTRIB=constant
 
 ################################################################################
 

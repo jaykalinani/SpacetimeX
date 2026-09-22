@@ -427,6 +427,7 @@ else if (hs.has_genuine_horizons())
 
     if (horizon_is_genuine) {
       if (AH_data_ptr->move_origins
+          && !AH_set_origins_to_punctures
           && AH_data_ptr->depends_on == 0
           && AH_data_ptr->found_flag)
       {
@@ -567,7 +568,8 @@ else if (hs.has_genuine_horizons())
           ps.synchronize();
         }
       }
-      if (track_origin_from_grid_scalar[hn]) {
+      if (track_origin_from_grid_scalar[hn] &&
+          !AH_set_origins_to_punctures) {
          track_origin(cctkGH, *ps_ptr, AH_data_ptr, hn, verbose_info.print_algorithm_details);
       }
       
