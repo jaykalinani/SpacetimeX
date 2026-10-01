@@ -940,6 +940,11 @@ extern "C" void WeylScal4_psi4_calc_4th(CCTK_ARGUMENTS)
   {
     CCTK_VInfo(CCTK_THORNSTRING,"Entering WeylScal4_psi4_calc_4th_Body");
   }
+  if ((psi4_calc_min_level >= 0 && cctk_level < psi4_calc_min_level) ||
+      (psi4_calc_max_level >= 0 && cctk_level > psi4_calc_max_level))
+  {
+    return;
+  }
   if (cctk_iteration % WeylScal4_psi4_calc_4th_calc_every != WeylScal4_psi4_calc_4th_calc_offset)
   {
     return;
