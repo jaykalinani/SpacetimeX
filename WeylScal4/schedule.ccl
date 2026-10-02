@@ -7,9 +7,19 @@ SCHEDULE GROUP WeylScal4_psi4_calc_4th_group AT postinitial
 {
 } "WeylScal4_psi4_calc_4th_group"
 
+SCHEDULE GROUP WeylScal4_psi4_sync_group AT postinitial
+  AFTER WeylScal4_psi4_calc_4th_group
+{
+} "Synchronize Psi4 after calculating it"
+
 SCHEDULE GROUP WeylScal4_psi4_calc_4th_group AT evol AFTER (ODESolvers_Solve, ODESolvers_Solve_Subcycling)
 {
 } "WeylScal4_psi4_calc_4th_group"
+
+SCHEDULE GROUP WeylScal4_psi4_sync_group AT evol
+  AFTER WeylScal4_psi4_calc_4th_group
+{
+} "Synchronize Psi4 after calculating it"
 
 SCHEDULE WeylScal4_psi4_calc_4th IN WeylScal4_psi4_calc_4th_group
 {
@@ -19,6 +29,10 @@ SCHEDULE WeylScal4_psi4_calc_4th IN WeylScal4_psi4_calc_4th_group
   READS: CoordinatesX::vertex_coords(everywhere)
   WRITES: Psi4i_group(interior)
   WRITES: Psi4r_group(interior)
-  SYNC: Psi4i_group
-  SYNC: Psi4r_group
 } "WeylScal4_psi4_calc_4th"
+
+SCHEDULE WeylScal4_SyncPsi4 IN WeylScal4_psi4_sync_group
+{
+  LANG: C
+  OPTIONS: GLOBAL
+} "Synchronize Psi4 only after an enabled Psi4 calculation"
