@@ -34,6 +34,13 @@ extern "C" void Z4c_Constraints(CCTK_ARGUMENTS) {
   DECLARE_CCTK_ARGUMENTS_Z4c_Constraints;
   DECLARE_CCTK_PARAMETERS;
 
+  // Keep the routine at its established Z4c_AnalysisGroup schedule position.
+  // Thus, on an enabled iteration it still precedes the normal analysis and
+  // output processing, while avoiding a full-grid constraint calculation on
+  // intervening iterations.
+  if (cctk_iteration % constraints_every != 0)
+    return;
+
   for (int d = 0; d < 3; ++d)
     if (cctk_nghostzones[d] < deriv_order / 2 + 1)
       CCTK_VERROR("Need at least %d ghost zones", deriv_order / 2 + 1);

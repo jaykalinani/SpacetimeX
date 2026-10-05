@@ -64,6 +64,10 @@ namespace AHFinderDirect
 //
 extern struct state state;
 
+// Set only by the recovery wrapper below.  Regular POSTSTEP calls always
+// honour find_every.
+static bool force_horizon_search_on_this_call = false;
+
 //******************************************************************************
 
 //
@@ -1155,12 +1159,14 @@ for (int hn = 1; hn <= state.my_hs->N_horizons(); ++ hn)
                              ? true
                              : cctk_time <= my_dont_find_after_time)
                          && my_find_every > 0
-                         && cctk_iteration % my_find_every == 0
+                         && (force_horizon_search_on_this_call ||
+                             cctk_iteration % my_find_every == 0)
                          && (AH_data.status != horizon_status__individual
                              || ! disable_horizon[hn]);
   AH_data.search_flag = find_this;
   find_any = find_any || find_this;
 }
+
 if (! find_any) return;
 
 if (state.timer_handle >= 0)
@@ -1654,5 +1660,16 @@ if (active_flag)
 	  }
 
 //******************************************************************************
+
+// This wrapper is scheduled only during recovery when explicitly requested.
+// It forces exactly one solve without changing the normal find_every cadence.
+extern "C"
+  void AHFinderDirect_resolve_horizons_on_recovery(CCTK_ARGUMENTS)
+{
+DECLARE_CCTK_ARGUMENTS_AHFinderDirect_resolve_horizons_on_recovery
+force_horizon_search_on_this_call = true;
+AHFinderDirect_find_horizons(CCTK_PASS_CTOC);
+force_horizon_search_on_this_call = false;
+}
 
 	  }	// namespace AHFinderDirect

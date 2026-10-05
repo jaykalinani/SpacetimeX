@@ -57,3 +57,33 @@ SCHEDULE qlm_calculate AT analysis AFTER (SphericalSurface_HasBeenSet TmunuBaseX
   WRITES: qlm_3determinant(everywhere)
   WRITES: qlm_scalars(everywhere)
 } "Calculate quasi-local quantities"
+
+# Recovery deliberately uses the ordinary qlm_calculate cadence check.  Thus
+# this is a no-op unless the checkpoint iteration is a multiple of
+# calculate_every; it never forces an expensive QLM calculation.
+SCHEDULE qlm_calculate AT CCTK_POST_RECOVER_VARIABLES \
+  AFTER (AHFinderDirect_restore_recovered_surfaces TmunuBaseX_SetTmunuVars)
+{
+  OPTIONS: global
+  LANG: Fortran
+  READS: SphericalSurface::sf_valid(everywhere)
+  READS: SphericalSurface::sf_radius(everywhere)
+  READS: SphericalSurface::sf_origin(everywhere)
+  READS: SphericalSurface::sf_coordinate_descriptors(everywhere)
+  READS: ADMBaseX::metric(everywhere)
+  READS: ADMBaseX::curv(everywhere)
+  READS: ADMBaseX::lapse(everywhere)
+  READS: ADMBaseX::shift(everywhere)
+  READS: TmunuBaseX::eTtt(everywhere)
+  READS: TmunuBaseX::eTti(everywhere)
+  READS: TmunuBaseX::eTij(everywhere)
+  WRITES: qlm_state(everywhere)
+  WRITES: qlm_grid_int(everywhere) qlm_grid_real(everywhere)
+  WRITES: qlm_shapes(everywhere)
+  WRITES: qlm_coordinates(everywhere)
+  WRITES: qlm_tetrad_l(everywhere) qlm_tetrad_n(everywhere) qlm_tetrad_m(everywhere)
+  WRITES: qlm_newman_penrose(everywhere) qlm_weyl_scalars(everywhere)
+  WRITES: qlm_ricci_scalars(everywhere) qlm_twometric(everywhere) qlm_killing_vector(everywhere)
+  WRITES: qlm_3determinant(everywhere)
+  WRITES: qlm_scalars(everywhere)
+} "Calculate cadence-selected quasi-local quantities after recovery"

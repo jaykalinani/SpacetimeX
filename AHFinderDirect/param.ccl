@@ -236,6 +236,11 @@ Boolean run_at_CCTK_POST_RECOVER_VARIABLES				\
 {
 } false
 
+BOOLEAN resolve_horizons_on_recovery
+  "Re-solve apparent horizons once after checkpoint recovery"
+{
+} "no"
+
 keyword method "what should this thorn do for each apparent horizon?" \
   STEERABLE=recover
 {
