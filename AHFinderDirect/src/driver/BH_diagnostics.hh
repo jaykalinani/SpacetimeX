@@ -129,7 +129,8 @@ public:
 		const;
 
 	// store the diagnostics in the Cactus variables
-        void store(CCTK_ARGUMENTS, int horizon_number, int surface_number)
+	void store(CCTK_ARGUMENTS, int horizon_number, int surface_number,
+	           bool allow_recovered_data = false)
                 const;
 
 	// save the horizon shape in grid arrays

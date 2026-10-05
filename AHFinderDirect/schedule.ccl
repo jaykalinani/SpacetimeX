@@ -42,6 +42,26 @@ schedule AHFinderDirect_recover at CCTK_POST_RECOVER_VARIABLES
    options: global
    } "import horizon data from Cactus variables"
 
+schedule AHFinderDirect_restore_recovered_surfaces at CCTK_POST_RECOVER_VARIABLES \
+   after AHFinderDirect_recover
+   {
+   lang: C
+   options: global
+   } "restore recovered apparent horizons into SphericalSurface"
+
+if (resolve_horizons_on_recovery != 0)
+  {
+  schedule AHFinderDirect_resolve_horizons_on_recovery at CCTK_POST_RECOVER_VARIABLES \
+     after AHFinderDirect_recover \
+     before AHFinderDirect_restore_recovered_surfaces
+     {
+     lang: C
+     options: global
+     READS: PunctureTracker::pt_loc
+     READS: PunctureTracker::pt_count
+     } "re-solve apparent horizons once after recovery"
+  }
+
 #
 # find horizons
 #

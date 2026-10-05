@@ -656,7 +656,8 @@ fflush(fileptr);
 // CCTK_ARGUMENTS
 //
 void BH_diagnostics::store(CCTK_ARGUMENTS,
-                           const int horizon_number, const int surface_number)
+                           const int horizon_number, const int surface_number,
+                           const bool allow_recovered_data)
 	const
 {
   DECLARE_CCTK_ARGUMENTS;
@@ -678,15 +679,14 @@ void BH_diagnostics::store(CCTK_ARGUMENTS,
     sf_active[surface_number] = 0;
   }
   
-  // only try to copy AH info if we've found AHs at this time level
-  if (! AH_data.search_flag) {
-    sf_valid[surface_number] = 0;
-    return;
-  }
-  
-  // did we actually *find* this horizon?
-  if (! AH_data.found_flag) {
-    sf_valid[surface_number] = -1;
+  // Normally a SphericalSurface is valid only on the slice on which its
+  // horizon was found.  During recovery, however, the saved horizon shape is
+  // an exact description of the recovered slice and must be republished for
+  // consumers such as QuasiLocalMeasures.
+  const bool have_current_data = AH_data.search_flag && AH_data.found_flag;
+  const bool have_recovered_data = allow_recovered_data && AH_data.has_been_found;
+  if (!have_current_data && !have_recovered_data) {
+    sf_valid[surface_number] = AH_data.search_flag ? -1 : 0;
     return;
   }
   
