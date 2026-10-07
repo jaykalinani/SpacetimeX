@@ -341,11 +341,16 @@ extern "C" void SphericalSurface_SetupRes (CCTK_ARGUMENTS)
 
     if (!auto_res[n])
     {
-      sf_delta_theta_estimate[n] = 0.0;
-      sf_delta_phi_estimate[n] = 0.0;
-      sf_minreflevel[n] = 0.0;
-      sf_maxreflevel[n] = 0.0;
-      continue;
+        // This routine declares the coordinate estimators and the min/max
+        // reflevels as output, so the driver is free to poison them before
+        // every call. Surfaces that do not use the automatic resolution
+        // never reach the code below that sets them, so give them a defined
+        // "no information" value here.
+        sf_delta_theta_estimate[n] = 0;
+        sf_delta_phi_estimate[n] = 0;
+        sf_minreflevel[n] = 0;
+        sf_maxreflevel[n] = 0;
+        continue;
     }
       
     CCTK_REAL my_radius;
