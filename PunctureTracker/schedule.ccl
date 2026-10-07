@@ -23,7 +23,7 @@ SCHEDULE PunctureTracker_Init AT initial
   WRITES: pt_group_properties
 } "Read initial location of punctures from parameter file"
 
-SCHEDULE GROUP PunctureTracker_SetupGroup AT initial AFTER PunctureTracker_Init
+SCHEDULE GROUP PunctureTracker_SetupGroup AT initial AFTER PunctureTracker_Init AFTER BoxInBox_Init
 {
 } "Setup puncture containter"
 
@@ -39,6 +39,7 @@ SCHEDULE PunctureTracker_Setup IN PunctureTracker_SetupGroup
   READS: pt_loc
   READS: pt_vel
   READS: pt_properties
+  READS: BoxInBox::positions
   WRITES: BoxInBox::positions
   WRITES: pt_count
   WRITES: pt_group_count
@@ -52,9 +53,12 @@ SCHEDULE PunctureTracker_Track AT evol AFTER ODESolvers_Solve
   LANG: C
   OPTIONS: GLOBAL
   READS: ADMBaseX::shift(everywhere)
+  READS: pt_loc
+  READS: pt_vel
   WRITES: pt_loc
   WRITES: pt_vel
   WRITES: pt_properties
+  READS: BoxInBox::positions
   WRITES: BoxInBox::positions
   WRITES: pt_count
   WRITES: pt_group_count

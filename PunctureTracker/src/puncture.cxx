@@ -28,10 +28,9 @@ static void joinRoots(std::vector<int> &parent, const int a, const int b) {
 }
 
 void PunctureContainer::updatePreviousTime(CCTK_ARGUMENTS) {
-  DECLARE_CCTK_ARGUMENTS;
   for (int n = 0; n < numPunctures_; ++n) {
     previousTime_[n] = time_[n];
-    time_[n] = cctk_time;
+    time_[n] = cctkGH->cctk_time;
   }
 }
 
