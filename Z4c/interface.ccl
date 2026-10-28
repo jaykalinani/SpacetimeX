@@ -42,12 +42,12 @@ CCTK_REAL allC TYPE=gf TAGS='checkpoint="no"' "constraint monitor"
 
 
 
-CCTK_REAL chi_rhs TYPE=gf TAGS='checkpoint="no"' "chi"
-CCTK_REAL gamma_tilde_rhs TYPE=gf TAGS='parities={+1 +1 +1   -1 -1 +1   -1 +1 -1   +1 +1 +1   +1 -1 -1   +1 +1 +1} checkpoint="no"' { gammatxx_rhs gammatxy_rhs gammatxz_rhs gammatyy_rhs gammatyz_rhs gammatzz_rhs } "gamma-tilde"
-CCTK_REAL K_hat_rhs TYPE=gf TAGS='checkpoint="no"' { Kh_rhs } "K-hat"
-CCTK_REAL A_tilde_rhs TYPE=gf TAGS='parities={+1 +1 +1   -1 -1 +1   -1 +1 -1   +1 +1 +1   +1 -1 -1   +1 +1 +1} checkpoint="no"' { Atxx_rhs Atxy_rhs Atxz_rhs Atyy_rhs Atyz_rhs Atzz_rhs } "A-tilde"
-CCTK_REAL Gam_tilde_rhs TYPE=gf TAGS='parities={-1 +1 +1   +1 -1 +1   +1 +1 -1} checkpoint="no"' { Gamtx_rhs Gamty_rhs Gamtz_rhs } "Gamma-tilde"
-CCTK_REAL Theta_rhs TYPE=gf TAGS='checkpoint="no"' "Theta"
-CCTK_REAL alphaG_rhs TYPE=gf TAGS='checkpoint="no"' "alpha"
-CCTK_REAL betaG_rhs TYPE=gf TAGS='parities={-1 +1 +1   +1 -1 +1   +1 +1 -1} checkpoint="no"' { betaGx_rhs betaGy_rhs betaGz_rhs } "beta"
+CCTK_REAL chi_rhs TIMELEVELS=4 TYPE=gf TAGS='checkpoint="no"' "chi"
+CCTK_REAL gamma_tilde_rhs TIMELEVELS=4 TYPE=gf TAGS='parities={+1 +1 +1   -1 -1 +1   -1 +1 -1   +1 +1 +1   +1 -1 -1   +1 +1 +1} checkpoint="no"' { gammatxx_rhs gammatxy_rhs gammatxz_rhs gammatyy_rhs gammatyz_rhs gammatzz_rhs } "gamma-tilde"
+CCTK_REAL K_hat_rhs TIMELEVELS=4 TYPE=gf TAGS='checkpoint="no"' { Kh_rhs } "K-hat"
+CCTK_REAL A_tilde_rhs TIMELEVELS=4 TYPE=gf TAGS='parities={+1 +1 +1   -1 -1 +1   -1 +1 -1   +1 +1 +1   +1 -1 -1   +1 +1 +1} checkpoint="no"' { Atxx_rhs Atxy_rhs Atxz_rhs Atyy_rhs Atyz_rhs Atzz_rhs } "A-tilde"
+CCTK_REAL Gam_tilde_rhs TIMELEVELS=4 TYPE=gf TAGS='parities={-1 +1 +1   +1 -1 +1   +1 +1 -1} checkpoint="no"' { Gamtx_rhs Gamty_rhs Gamtz_rhs } "Gamma-tilde"
+CCTK_REAL Theta_rhs TIMELEVELS=4 TYPE=gf TAGS='checkpoint="no"' "Theta"
+CCTK_REAL alphaG_rhs TIMELEVELS=4 TYPE=gf TAGS='checkpoint="no"' "alpha"
+CCTK_REAL betaG_rhs TIMELEVELS=4 TYPE=gf TAGS='parities={-1 +1 +1   +1 -1 +1   +1 +1 -1} checkpoint="no"' { betaGx_rhs betaGy_rhs betaGz_rhs } "beta"
 

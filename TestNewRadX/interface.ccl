@@ -14,7 +14,7 @@ CCTK_REAL state TYPE=gf CENTERING={VVV} TAGS='rhs="rhs"'
   vv
 } "Scalar wave state vector: scalar field and its time derivative"
 
-CCTK_REAL rhs TYPE=gf CENTERING={VVV} TAGS='checkpoint="no"'
+CCTK_REAL rhs TIMELEVELS=4 TYPE=gf CENTERING={VVV} TAGS='checkpoint="no"'
 {
   uu_rhs
   vv_rhs
