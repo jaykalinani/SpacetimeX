@@ -103,6 +103,16 @@ PROVIDES FUNCTION HorizonRadiusInDirection				\
 	WITH AHFinderDirect_radius_in_direction				\
 	LANGUAGE C
 
+CCTK_INT FUNCTION AHFinderDirect_ForceInitialSearch(
+  CCTK_POINTER_TO_CONST IN cctkGH,
+  CCTK_INT IN nhorizons,
+  CCTK_INT OUT ARRAY valid,
+  CCTK_INT OUT ARRAY surface_index)
+
+PROVIDES FUNCTION AHFinderDirect_ForceInitialSearch
+  WITH AHFinderDirect_force_initial_search
+  LANGUAGE C
+
 ################################################################################
 
 # Grid arrays to store the horizon shape, for easy output and checkpointing.

@@ -67,6 +67,9 @@ extern struct state state;
 // Set only by the recovery wrapper below.  Regular POSTSTEP calls always
 // honour find_every.
 static bool force_horizon_search_on_this_call = false;
+static int forced_horizon_count = -1;
+
+extern "C" void AHFinderDirect_store(CCTK_ARGUMENTS);
 
 //******************************************************************************
 
@@ -1255,6 +1258,7 @@ extern "C"
 {
 DECLARE_CCTK_ARGUMENTS_AHFinderDirect_find_horizons
 DECLARE_CCTK_PARAMETERS
+const bool calibration_search = forced_horizon_count >= 0;
 
 // A spatial interpolation spanning asynchronous AMR levels would require
 // time interpolation, which AHFinderDirect does not provide.
@@ -1295,6 +1299,8 @@ for (int hn = 1; hn <= state.my_hs->N_horizons(); ++ hn)
                          && my_find_every > 0
                          && (force_horizon_search_on_this_call ||
                              cctk_iteration % my_find_every == 0)
+                         && (!calibration_search ||
+                             hn <= forced_horizon_count)
                          && (AH_data.status != horizon_status__individual
                              || ! disable_horizon[hn]);
   AH_data.search_flag = find_this;
@@ -1398,11 +1404,19 @@ IO_info.output_Theta
 IO_info.output_mean_curvature
    = (IO_info.output_mean_curvature_every > 0)
      && ((IO_info.time_iteration % IO_info.output_mean_curvature_every) == 0);
+if (calibration_search)
+   then {
+	IO_info.output_BH_diagnostics = false;
+	IO_info.output_initial_guess = false;
+	IO_info.output_h = false;
+	IO_info.output_Theta = false;
+	IO_info.output_mean_curvature = false;
+	}
 
 // Discover merger candidates before preparing initial guesses and running
 // Newton.  Newly created candidates have search_flag set by the discovery
 // routines, so they are solved in this same horizon-finder call.
-if (state.method == method__find_horizons)
+if (state.method == method__find_horizons && !calibration_search)
    then {
         if (cctk_iteration >= merger_discovery_min_iteration) {
 	  discover_method1_mergers(CCTK_PASS_CTOC);
@@ -1427,7 +1441,7 @@ if (state.method == method__find_horizons)
 // and removes the candidate from this call's Newton work.  On the next
 // horizon-finding call the confirmed daughter is selected normally and is
 // evolved from that copied shape.
-	if (state.method == method__find_horizons &&
+	if (state.method == method__find_horizons && !calibration_search &&
 	    promote_common_parent_surface) {
 	  for (int hn = 1; hn <= N_horizons; ++hn) {
 	    if (recognize_common_parent_surface(
@@ -1842,6 +1856,37 @@ DECLARE_CCTK_ARGUMENTS_AHFinderDirect_resolve_horizons_on_recovery
 force_horizon_search_on_this_call = true;
 AHFinderDirect_find_horizons(CCTK_PASS_CTOC);
 force_horizon_search_on_this_call = false;
+}
+
+extern "C" CCTK_INT AHFinderDirect_force_initial_search(
+    CCTK_POINTER_TO_CONST cctkGH_pointer, const CCTK_INT nhorizons,
+    CCTK_INT *const valid, CCTK_INT *const surface_index)
+{
+if (!cctkGH_pointer || nhorizons < 0 || !valid || !surface_index)
+   then return -1;
+for (int horizon = 0; horizon < nhorizons; ++horizon) {
+   valid[horizon] = 0;
+   surface_index[horizon] = -1;
+   }
+
+cGH* const cctkGH =
+    const_cast<cGH*>(static_cast<const cGH*>(cctkGH_pointer));
+DECLARE_CCTK_PARAMETERS
+force_horizon_search_on_this_call = true;
+forced_horizon_count = nhorizons;
+AHFinderDirect_find_horizons(cctkGH);
+forced_horizon_count = -1;
+force_horizon_search_on_this_call = false;
+AHFinderDirect_store(cctkGH);
+
+const int count = std::min(nhorizons, state.N_horizons);
+for (int horizon = 0; horizon < count; ++horizon) {
+   valid[horizon] = state.AH_data_array[horizon + 1]->found_flag ? 1 : 0;
+   surface_index[horizon] = sf_IdFromName(
+       which_surface_to_store_info[horizon + 1],
+       which_surface_to_store_info_by_name[horizon + 1]);
+   }
+return 0;
 }
 
 	  }	// namespace AHFinderDirect

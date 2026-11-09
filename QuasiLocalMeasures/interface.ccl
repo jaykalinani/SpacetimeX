@@ -4,6 +4,28 @@ IMPLEMENTS: QuasiLocalMeasures
 
 INHERITS: ADMBaseX SphericalSurface TmunuBaseX
 
+void FUNCTION CallScheduleGroup(
+  CCTK_POINTER IN cctkGH,
+  CCTK_STRING IN groupname)
+REQUIRES FUNCTION CallScheduleGroup
+
+CCTK_INT FUNCTION AHFinderDirect_ForceInitialSearch(
+  CCTK_POINTER_TO_CONST IN cctkGH,
+  CCTK_INT IN nhorizons,
+  CCTK_INT OUT ARRAY valid,
+  CCTK_INT OUT ARRAY surface_index)
+USES FUNCTION AHFinderDirect_ForceInitialSearch
+
+CCTK_INT FUNCTION AHFinderDirect_MeasureInitialMasses(
+  CCTK_POINTER_TO_CONST IN cctkGH,
+  CCTK_INT IN npunctures,
+  CCTK_REAL OUT ARRAY measured_mass,
+  CCTK_INT OUT ARRAY valid)
+
+PROVIDES FUNCTION AHFinderDirect_MeasureInitialMasses
+  WITH QuasiLocalMeasures_MeasureInitialMasses
+  LANGUAGE C
+
 void FUNCTION Interpolate(
   CCTK_POINTER_TO_CONST IN cctkGH,
   CCTK_INT IN npoints,
