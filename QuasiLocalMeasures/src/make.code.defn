@@ -5,6 +5,7 @@ SRCS =  qlm_3determinant.F90			\
         qlm_analyse.F90				\
         qlm_boundary.F90			\
         qlm_broadcast.c				\
+        mass_calibration.cxx			\
         qlm_calculate.F90			\
         qlm_coordinates.F90			\
         qlm_derivs.F90				\
