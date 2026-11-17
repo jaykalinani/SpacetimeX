@@ -583,7 +583,12 @@ return fileptr;
 void BH_diagnostics::output(FILE*fileptr, const struct IO_info& IO_info)
 	const
 {
-assert(fileptr != NULL);
+if (fileptr == NULL) {
+  CCTK_VWarn(CCTK_WARN_ALERT, __LINE__, __FILE__, CCTK_THORNSTRING,
+             "Skipping BH diagnostics output because the output file is "
+             "not open");
+  return;
+}
 
 fprintf(fileptr,
      //  cctk_iteration        min radius      mean radius
@@ -663,9 +668,14 @@ void BH_diagnostics::store(CCTK_ARGUMENTS,
   DECLARE_CCTK_ARGUMENTS;
   DECLARE_CCTK_PARAMETERS;
   
-  assert (surface_number >= 0 && surface_number < nsurfaces);
-  
-  assert(state.AH_data_array[horizon_number] != NULL);
+  if (surface_number < 0 || surface_number >= nsurfaces ||
+      horizon_number < 1 || horizon_number > state.N_horizons ||
+      state.AH_data_array[horizon_number] == NULL) {
+    CCTK_VWarn(CCTK_WARN_ALERT, __LINE__, __FILE__, CCTK_THORNSTRING,
+               "Skipping SphericalSurface publication for invalid horizon "
+               "%d or surface %d", horizon_number, surface_number);
+    return;
+  }
   const struct AH_data& AH_data = *state.AH_data_array[horizon_number];
   
   // tell the world if we don't look for this horizon any more
@@ -675,7 +685,12 @@ void BH_diagnostics::store(CCTK_ARGUMENTS,
   if ((my_dont_find_after >= 0 and cctk_iteration > my_dont_find_after) or
       (my_dont_find_after_time > my_find_after_time and cctk_time > my_dont_find_after_time))
   {
-    assert (! AH_data.search_flag);
+    if (AH_data.search_flag) {
+      CCTK_VWarn(CCTK_WARN_ALERT, __LINE__, __FILE__, CCTK_THORNSTRING,
+                 "Horizon %d remains scheduled beyond its configured "
+                 "dont_find limit; publishing it as inactive",
+                 horizon_number);
+    }
     sf_active[surface_number] = 0;
   }
   
@@ -714,6 +729,16 @@ void BH_diagnostics::store(CCTK_ARGUMENTS,
   sf_min_z        [surface_number] = min_z;
   sf_max_z        [surface_number] = max_z;
   sf_area         [surface_number] = area;
+
+  if (sf_ntheta[surface_number] <= 0 || sf_nphi[surface_number] <= 0) {
+    CCTK_VWarn(CCTK_WARN_ALERT, __LINE__, __FILE__, CCTK_THORNSTRING,
+               "Cannot publish horizon %d on SphericalSurface %d: invalid "
+               "angular dimensions (%d,%d)",
+               horizon_number, surface_number,
+               int(sf_ntheta[surface_number]), int(sf_nphi[surface_number]));
+    sf_valid[surface_number] = -1;
+    return;
+  }
   
   std::vector<CCTK_REAL> xx, yy, zz, rr;
   xx.resize (sf_ntheta[surface_number] * sf_nphi[surface_number]);
@@ -734,9 +759,13 @@ void BH_diagnostics::store(CCTK_ARGUMENTS,
       ++n;
     }
   }
-  AHFinderDirect_radius_in_direction
-    (horizon_number, sf_ntheta[surface_number] * sf_nphi[surface_number],
-     &xx[0], &yy[0], &zz[0], &rr[0]);
+  if (AHFinderDirect_radius_in_direction(
+          horizon_number,
+          sf_ntheta[surface_number] * sf_nphi[surface_number],
+          xx.data(), yy.data(), zz.data(), rr.data()) < 0) {
+    sf_valid[surface_number] = -1;
+    return;
+  }
   n = 0;
   for (int j=0; j<sf_nphi[surface_number]; ++j) {
     for (int i=0; i<sf_ntheta[surface_number]; ++i) {
@@ -761,7 +790,14 @@ void BH_diagnostics::save(CCTK_ARGUMENTS,
   DECLARE_CCTK_ARGUMENTS;
   DECLARE_CCTK_PARAMETERS;
   
-  assert(state.AH_data_array[horizon_number] != NULL);
+  if (horizon_number < 1 || horizon_number > state.N_horizons ||
+      state.AH_data_array[horizon_number] == NULL ||
+      state.AH_data_array[horizon_number]->ps_ptr == NULL) {
+    CCTK_VWarn(CCTK_WARN_ALERT, __LINE__, __FILE__, CCTK_THORNSTRING,
+               "Skipping BH diagnostics save for invalid horizon %d",
+               horizon_number);
+    return;
+  }
   const struct verbose_info& verbose_info = state.verbose_info;
   const struct AH_data& AH_data = *state.AH_data_array[horizon_number];
   patch_system& ps = *AH_data.ps_ptr;
@@ -790,13 +826,25 @@ void BH_diagnostics::save(CCTK_ARGUMENTS,
   ah_origin_y[horizon_number-1] = ps.origin_y();
   ah_origin_z[horizon_number-1] = ps.origin_z();
   
+  if (ps.N_patches() > 6) {
+    CCTK_VWarn(CCTK_WARN_ALERT, __LINE__, __FILE__, CCTK_THORNSTRING,
+               "Skipping horizon %d checkpoint save: patch count %d exceeds "
+               "the checkpoint layout capacity 6",
+               horizon_number, ps.N_patches());
+    return;
+  }
   for (int pn = 0; pn < ps.N_patches(); ++pn) {
-    assert (pn < 6);
     patch& p = ps.ith_patch(pn);
+    if (p.max_irho() - p.min_irho() > max_N_zones_per_right_angle ||
+        p.max_isigma() - p.min_isigma() > max_N_zones_per_right_angle) {
+      CCTK_VWarn(CCTK_WARN_ALERT, __LINE__, __FILE__, CCTK_THORNSTRING,
+                 "Skipping horizon %d checkpoint save: patch %d exceeds "
+                 "max_N_zones_per_right_angle=%d",
+                 horizon_number, pn, int(max_N_zones_per_right_angle));
+      return;
+    }
     for (int i = 0, irho = p.min_irho(); irho <= p.max_irho(); ++i, ++irho) {
-      assert (i <= max_N_zones_per_right_angle);
       for (int j = 0, isigma = p.min_isigma(); isigma <= p.max_isigma(); ++j, ++isigma) {
-        assert (j <= max_N_zones_per_right_angle);
         ah_radius[i + (max_N_zones_per_right_angle+1) * (j + (max_N_zones_per_right_angle+1) * (pn + 6 * (horizon_number-1)))]
           = p.ghosted_gridfn(gfns::gfn__h, irho,isigma);
       }
@@ -854,7 +902,14 @@ void BH_diagnostics::load(CCTK_ARGUMENTS,
   DECLARE_CCTK_ARGUMENTS;
   DECLARE_CCTK_PARAMETERS;
   
-  assert(state.AH_data_array[horizon_number] != NULL);
+  if (horizon_number < 1 || horizon_number > state.N_horizons ||
+      state.AH_data_array[horizon_number] == NULL ||
+      state.AH_data_array[horizon_number]->ps_ptr == NULL) {
+    CCTK_VWarn(CCTK_WARN_ALERT, __LINE__, __FILE__, CCTK_THORNSTRING,
+               "Skipping BH diagnostics recovery for invalid horizon %d",
+               horizon_number);
+    return;
+  }
   const struct verbose_info& verbose_info = state.verbose_info;
   struct AH_data& AH_data = *state.AH_data_array[horizon_number];
   patch_system& ps = *AH_data.ps_ptr;
@@ -870,13 +925,25 @@ void BH_diagnostics::load(CCTK_ARGUMENTS,
     ps.origin_z(ah_origin_z[horizon_number-1]);
   }
   
+  if (ps.N_patches() > 6) {
+    CCTK_VWarn(CCTK_WARN_ALERT, __LINE__, __FILE__, CCTK_THORNSTRING,
+               "Skipping horizon %d checkpoint recovery: patch count %d "
+               "exceeds the checkpoint layout capacity 6",
+               horizon_number, ps.N_patches());
+    return;
+  }
   for (int pn = 0; pn < ps.N_patches(); ++pn) {
-    assert (pn < 6);
     patch& p = ps.ith_patch(pn);
+    if (p.max_irho() - p.min_irho() > max_N_zones_per_right_angle ||
+        p.max_isigma() - p.min_isigma() > max_N_zones_per_right_angle) {
+      CCTK_VWarn(CCTK_WARN_ALERT, __LINE__, __FILE__, CCTK_THORNSTRING,
+                 "Skipping horizon %d checkpoint recovery: patch %d exceeds "
+                 "max_N_zones_per_right_angle=%d",
+                 horizon_number, pn, int(max_N_zones_per_right_angle));
+      return;
+    }
     for (int i = 0, irho = p.min_irho(); irho <= p.max_irho(); ++i, ++irho) {
-      assert (i <= max_N_zones_per_right_angle);
       for (int j = 0, isigma = p.min_isigma(); isigma <= p.max_isigma(); ++j, ++isigma) {
-        assert (j <= max_N_zones_per_right_angle);
         p.ghosted_gridfn(gfns::gfn__h, irho,isigma) =
           ah_radius[i + (max_N_zones_per_right_angle+1) * (j + (max_N_zones_per_right_angle+1) * (pn + 6 * (horizon_number-1)))];
       }

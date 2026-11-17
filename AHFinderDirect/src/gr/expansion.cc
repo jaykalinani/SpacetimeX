@@ -97,7 +97,7 @@ void Schwarzschild_EF_geometry(patch_system& ps,
 
 bool h_is_finite(patch_system& ps,
 		 const struct error_info& error_info, bool initial_flag,
-		 bool print_msg_flag);
+		 fp max_allowable_radius, bool print_msg_flag);
 bool geometry_is_finite(patch_system& ps,
 			const struct error_info& error_info, bool initial_flag,
 			bool print_msg_flag);
@@ -185,6 +185,7 @@ enum expansion_status
 	    const struct cactus_grid_info& cgi,
 	    const struct geometry_info& gi,
 	    const struct error_info& error_info, bool initial_flag,
+	    fp max_allowable_radius,
 	    bool Jacobian_flag /* = false */,
 	    bool print_msg_flag /* = false */,
 	    jtutil::norm<fp>* Theta_norms_ptr /* = NULL */,
@@ -205,14 +206,16 @@ if (active_flag)
 	// normal computation
 	//
 
-	// fill in values of all ghosted gridfns in ghost zones
-	ps_ptr->synchronize();
-
-	if (gi.check_that_h_is_finite && !h_is_finite(*ps_ptr,
-						      error_info, initial_flag,
-						      print_msg_flag))
+	// Validate the nominal surface before interpatch interpolation.  Do not
+	// feed NaNs, non-positive radii, or points beyond the configured
+	// per-horizon limit into the interpolation machinery.
+	if (!h_is_finite(*ps_ptr, error_info, initial_flag,
+	                 max_allowable_radius, print_msg_flag))
 	   then return expansion_failure__surface_nonfinite;
 							// *** ERROR RETURN ***
+
+	// fill in values of all ghosted gridfns in ghost zones
+	ps_ptr->synchronize();
 
 	// set up xyz positions of grid points
 	setup_xyz_posns(*ps_ptr, print_msg_flag);
@@ -344,7 +347,11 @@ if (active_flag)
             break;
           }
           default:
-            assert (0);
+            CCTK_VWarn(CCTK_WARN_ALERT, __LINE__, __FILE__,
+                       CCTK_THORNSTRING,
+                       "Invalid areal-radius definition %d; rejecting "
+                       "this surface", int(compute_info.surface_selection));
+            return expansion_failure__invalid_configuration;
           } // switch areal_radius_definition
           
           if (! ps_ptr->N_additional_points()) {
@@ -1131,12 +1138,11 @@ if (print_msg_flag)
 namespace {
 bool h_is_finite(patch_system& ps,
 		 const struct error_info& error_info, bool initial_flag,
-		 bool print_msg_flag)
+		 fp max_allowable_radius, bool print_msg_flag)
 {
 if (print_msg_flag)
    then CCTK_VInfo(CCTK_THORNSTRING, "      checking that h is finite");
 
-#ifdef HAVE_FINITE
 	for (int pn = 0 ; pn < ps.N_patches() ; ++pn)
 	{
 	patch& p = ps.ith_patch(pn);
@@ -1148,33 +1154,38 @@ if (print_msg_flag)
 		     ++isigma)
 		{
 		const fp h = p.ghosted_gridfn(gfns::gfn__h, irho,isigma);
-		if (!std::isfinite(h))
+		if (!std::isfinite(h) || !(h > 0.0) ||
+		    (max_allowable_radius > 0.0 && h > max_allowable_radius))
 		   then {
 			const fp rho = p.rho_of_irho(irho);
 			const fp sigma = p.sigma_of_isigma(isigma);
 			const fp drho   = jtutil::degrees_of_radians(rho);
 			const fp dsigma = jtutil::degrees_of_radians(sigma);
-			CCTK_VWarn(error_info.warn_level__nonfinite_geometry,
-				   __LINE__, __FILE__, CCTK_THORNSTRING,
+                        if (max_allowable_radius > 0.0) {
+			  CCTK_VWarn(error_info.warn_level__nonfinite_geometry,
+				     __LINE__, __FILE__, CCTK_THORNSTRING,
 "\n"
-"   h=%g isn't finite!\n"
+"   h=%g is not a valid surface radius (required 0 < h <= %g)!\n"
 "   %s patch (rho,sigma)=(%g,%g) (drho,dsigma)=(%g,%g)\n"
-				   ,
-				   double(h),
-				   p.name(), double(rho), double(sigma),
-					     double(drho), double(dsigma));
+				     , double(h), double(max_allowable_radius),
+				     p.name(), double(rho), double(sigma),
+				     double(drho), double(dsigma));
+                        } else {
+			  CCTK_VWarn(error_info.warn_level__nonfinite_geometry,
+				     __LINE__, __FILE__, CCTK_THORNSTRING,
+"\n"
+"   h=%g is not a valid surface radius (required h > 0)!\n"
+"   %s patch (rho,sigma)=(%g,%g) (drho,dsigma)=(%g,%g)\n"
+				     , double(h), p.name(), double(rho),
+                                     double(sigma), double(drho),
+                                     double(dsigma));
+                        }
 			return false;			// *** found a NaN ***
 			}
 		}
 		}
 	}
 return true;					// *** all values finite ***
-#else
-CCTK_VWarn(error_info.warn_level__skipping_finite_check,
-	   __LINE__, __FILE__, CCTK_THORNSTRING,
-           "      no finite() fn ==>  skipping is-h-finite check");
-return true;					// *** no check possible ***
-#endif
 }
 	  }
 
@@ -1549,7 +1560,14 @@ CCTK_VWarn(warn_level, __LINE__, __FILE__, CCTK_THORNSTRING,
 			return false;			// *** ERROR RETURN ***
 			}
 
-                assert (compute_info.surface_selection == selection_definition);
+                if (compute_info.surface_selection != selection_definition) {
+                  CCTK_VWarn(CCTK_WARN_ALERT, __LINE__, __FILE__,
+                             CCTK_THORNSTRING,
+                             "Invalid surface selection %d in "
+                             "compute_Theta()",
+                             int(compute_info.surface_selection));
+                  return false;
+                }
 
 		// compute H via equation (14) of my 1996 horizon finding paper
 		const fp sqrt_Theta_D = sqrt(Theta_D);
@@ -1577,7 +1595,12 @@ CCTK_VWarn(warn_level, __LINE__, __FILE__, CCTK_THORNSTRING,
                   Theta = (+ Theta_X + Theta_Y) * (- Theta_X + Theta_Y);
                   break;
                 default:
-                  assert (0);
+                  CCTK_VWarn(CCTK_WARN_ALERT, __LINE__, __FILE__,
+                             CCTK_THORNSTRING,
+                             "Invalid surface definition %d in "
+                             "compute_Theta()",
+                             int(compute_info.surface_definition));
+                  return false;
                 }
 
                 switch (compute_info.surface_modification) {
@@ -1603,7 +1626,12 @@ CCTK_VWarn(warn_level, __LINE__, __FILE__, CCTK_THORNSTRING,
                   break;
 #endif
                 default:
-                  assert (0);
+                  CCTK_VWarn(CCTK_WARN_ALERT, __LINE__, __FILE__,
+                             CCTK_THORNSTRING,
+                             "Invalid surface modification %d in "
+                             "compute_Theta()",
+                             int(compute_info.surface_modification));
+                  return false;
                 }
 
                 Theta -= compute_info.desired_value;
@@ -1708,7 +1736,12 @@ CCTK_VWarn(warn_level, __LINE__, __FILE__, CCTK_THORNSTRING,
                   }
                     
                   default:
-                    assert (0);
+                    CCTK_VWarn(CCTK_WARN_ALERT, __LINE__, __FILE__,
+                               CCTK_THORNSTRING,
+                               "Invalid surface definition %d while "
+                               "constructing Jacobian coefficients",
+                               int(compute_info.surface_definition));
+                    return false;
                   }
                 }
 

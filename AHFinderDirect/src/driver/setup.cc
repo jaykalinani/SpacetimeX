@@ -274,7 +274,7 @@ int find_unused_horizon_slot()
 
 //******************************************************************************
 
-void initialize_candidate_slot(
+bool initialize_candidate_slot(
     CCTK_ARGUMENTS,
     const int candidate_hn,
     const std::vector<int>& parent_horizons,
@@ -288,67 +288,89 @@ void initialize_candidate_slot(
   DECLARE_CCTK_PARAMETERS;
 
   if (candidate_hn < 1 || candidate_hn > N_horizons) {
-    CCTK_VWarn(FATAL_ERROR, __LINE__, __FILE__, CCTK_THORNSTRING,
+    CCTK_VWarn(CCTK_WARN_ALERT, __LINE__, __FILE__, CCTK_THORNSTRING,
                "Candidate horizon number %d is outside the valid range 1:%d",
                candidate_hn, int(N_horizons));
+    return false;
   }
   if (parent_horizons.size() < 2) {
-    CCTK_VWarn(FATAL_ERROR, __LINE__, __FILE__, CCTK_THORNSTRING,
+    CCTK_VWarn(CCTK_WARN_ALERT, __LINE__, __FILE__, CCTK_THORNSTRING,
                "Candidate horizon %d must have at least two parents",
                candidate_hn);
+    return false;
   }
   if (candidate_method != candidate_discovery_method__method1 &&
       candidate_method != candidate_discovery_method__method2) {
-    CCTK_VWarn(FATAL_ERROR, __LINE__, __FILE__, CCTK_THORNSTRING,
+    CCTK_VWarn(CCTK_WARN_ALERT, __LINE__, __FILE__, CCTK_THORNSTRING,
                "Candidate horizon %d has invalid discovery method %d",
                candidate_hn, int(candidate_method));
+    return false;
   }
   if (!isfinite(candidate_origin_x) || !isfinite(candidate_origin_y) ||
       !isfinite(candidate_origin_z) || !isfinite(candidate_radius) ||
       candidate_radius <= 0.0) {
-    CCTK_VWarn(FATAL_ERROR, __LINE__, __FILE__, CCTK_THORNSTRING,
+    CCTK_VWarn(CCTK_WARN_ALERT, __LINE__, __FILE__, CCTK_THORNSTRING,
                "Candidate horizon %d has an invalid origin or radius",
                candidate_hn);
+    return false;
   }
 
   struct AH_data& candidate = *state.AH_data_array[candidate_hn];
   if (candidate.status != horizon_status__unused) {
-    CCTK_VWarn(FATAL_ERROR, __LINE__, __FILE__, CCTK_THORNSTRING,
+    CCTK_VWarn(CCTK_WARN_ALERT, __LINE__, __FILE__, CCTK_THORNSTRING,
                "Cannot initialize horizon %d as a candidate: slot status is %d",
                candidate_hn, int(candidate.status));
+    return false;
   }
   const int duplicate_hn =
       find_horizon_with_parent_group(parent_horizons);
   if (duplicate_hn != 0) {
-    CCTK_VWarn(FATAL_ERROR, __LINE__, __FILE__, CCTK_THORNSTRING,
+    CCTK_VWarn(CCTK_WARN_ALERT, __LINE__, __FILE__, CCTK_THORNSTRING,
                "Cannot initialize candidate horizon %d: horizon %d already "
                "represents the same parent group",
                candidate_hn, duplicate_hn);
+    return false;
   }
 
   for (std::vector<int>::size_type i = 0; i < parent_horizons.size(); ++i) {
     const int parent_hn = parent_horizons[i];
     if (parent_hn < 1 || parent_hn > N_horizons ||
         parent_hn == candidate_hn) {
-      CCTK_VWarn(FATAL_ERROR, __LINE__, __FILE__, CCTK_THORNSTRING,
+      CCTK_VWarn(CCTK_WARN_ALERT, __LINE__, __FILE__, CCTK_THORNSTRING,
                  "Candidate horizon %d has invalid parent horizon %d",
                  candidate_hn, parent_hn);
+      return false;
     }
     const struct AH_data& parent = *state.AH_data_array[parent_hn];
     if (!parent.has_been_found ||
         (parent.status != horizon_status__individual &&
          parent.status != horizon_status__confirmed)) {
-      CCTK_VWarn(FATAL_ERROR, __LINE__, __FILE__, CCTK_THORNSTRING,
+      CCTK_VWarn(CCTK_WARN_ALERT, __LINE__, __FILE__, CCTK_THORNSTRING,
                  "Candidate horizon %d has ineligible parent horizon %d",
                  candidate_hn, parent_hn);
+      return false;
     }
     for (std::vector<int>::size_type j = 0; j < i; ++j) {
       if (parent_horizons[j] == parent_hn) {
-        CCTK_VWarn(FATAL_ERROR, __LINE__, __FILE__, CCTK_THORNSTRING,
+        CCTK_VWarn(CCTK_WARN_ALERT, __LINE__, __FILE__, CCTK_THORNSTRING,
                    "Candidate horizon %d lists parent %d more than once",
                    candidate_hn, parent_hn);
+        return false;
       }
     }
+  }
+
+  fp candidate_mass = 0.0;
+  for (std::vector<int>::const_iterator parent_hn =
+           parent_horizons.begin();
+       parent_hn != parent_horizons.end(); ++parent_hn) {
+    candidate_mass += state.AH_data_array[*parent_hn]->mass;
+  }
+  if (!isfinite(candidate_mass) || candidate_mass <= 0.0) {
+    CCTK_VWarn(CCTK_WARN_ALERT, __LINE__, __FILE__, CCTK_THORNSTRING,
+               "Candidate horizon %d has invalid summed parent mass %g",
+               candidate_hn, double(candidate_mass));
+    return false;
   }
 
   patch_system& ps = *candidate.ps_ptr;
@@ -362,18 +384,6 @@ void initialize_candidate_slot(
   candidate.initial_guess_info.coord_sphere_info.y_center = candidate_origin_y;
   candidate.initial_guess_info.coord_sphere_info.z_center = candidate_origin_z;
   candidate.initial_guess_info.coord_sphere_info.radius = candidate_radius;
-
-  fp candidate_mass = 0.0;
-  for (std::vector<int>::const_iterator parent_hn =
-           parent_horizons.begin();
-       parent_hn != parent_horizons.end(); ++parent_hn) {
-    candidate_mass += state.AH_data_array[*parent_hn]->mass;
-  }
-  if (!isfinite(candidate_mass) || candidate_mass <= 0.0) {
-    CCTK_VWarn(FATAL_ERROR, __LINE__, __FILE__, CCTK_THORNSTRING,
-               "Candidate horizon %d has invalid summed parent mass %g",
-               candidate_hn, double(candidate_mass));
-  }
 
   candidate.initial_find_flag = true;
   candidate.really_initial_find_flag = true;
@@ -412,6 +422,7 @@ void initialize_candidate_slot(
   ah_centroid_valid_p[n] = 0;
   ah_centroid_iteration_p[n] = -1;
   candidate.BH_diagnostics.save(cctkGH, candidate_hn);
+  return true;
 }
 
 //******************************************************************************
@@ -422,17 +433,19 @@ void reset_candidate_slot(CCTK_ARGUMENTS, const int candidate_hn)
   DECLARE_CCTK_PARAMETERS;
 
   if (candidate_hn < 1 || candidate_hn > N_horizons) {
-    CCTK_VWarn(FATAL_ERROR, __LINE__, __FILE__, CCTK_THORNSTRING,
+    CCTK_VWarn(CCTK_WARN_ALERT, __LINE__, __FILE__, CCTK_THORNSTRING,
                "Candidate horizon number %d is outside the valid range 1:%d",
                candidate_hn, int(N_horizons));
+    return;
   }
 
   struct AH_data& candidate = *state.AH_data_array[candidate_hn];
   if (candidate.status != horizon_status__candidate ||
       candidate.has_been_found) {
-    CCTK_VWarn(FATAL_ERROR, __LINE__, __FILE__, CCTK_THORNSTRING,
+    CCTK_VWarn(CCTK_WARN_ALERT, __LINE__, __FILE__, CCTK_THORNSTRING,
                "Cannot reset horizon %d: it is not an unconverged candidate",
                candidate_hn);
+    return;
   }
 
   candidate.initial_find_flag = true;

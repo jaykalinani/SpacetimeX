@@ -100,6 +100,9 @@ enum	expansion_status
 	// non-finite() (i.e. +/-infinity or NaN) values found in h
 	expansion_failure__surface_nonfinite,
 
+	// invalid surface-definition/modification metadata
+	expansion_failure__invalid_configuration,
+
 	// surface is too large
 	// ... this value is never returned by  expansion()  or
 	//      expansion_Jacobian() , but is placed in this enum
@@ -241,6 +244,7 @@ enum expansion_status
 	    const struct cactus_grid_info& cgi,
 	    const struct geometry_info& gi,
 	    const struct error_info& error_info, bool initial_flag,
+	    fp max_allowable_radius,
 	    bool Jacobian_flag = false,
 	    bool print_msg_flag = false,
 	    jtutil::norm<fp>* H_norms_ptr = NULL,
@@ -257,6 +261,7 @@ enum expansion_status
 		     const struct geometry_info& gi,
 		     const struct Jacobian_info& Jacobian_info,
 		     const struct error_info& error_info, bool initial_flag,
+		     fp max_allowable_radius,
 		     bool print_msg_flag = false);
 
 // Schwarzschild_EF.cc

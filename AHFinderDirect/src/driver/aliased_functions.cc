@@ -82,15 +82,19 @@ if (!  ((horizon_number >= 1) && (horizon_number <= state.N_horizons))  )
 	return -1;					// *** ERROR RETURN ***
 	}
 
-assert(state.AH_data_array[horizon_number] != NULL);
+if (state.AH_data_array[horizon_number] == NULL ||
+    p_origin_x == NULL || p_origin_y == NULL || p_origin_z == NULL) {
+  CCTK_VWarn(CCTK_WARN_ALERT, __LINE__, __FILE__, CCTK_THORNSTRING,
+             "AHFinderDirect_local_coordinate_origin(): invalid internal "
+             "horizon storage or null output pointer for horizon %d",
+             int(horizon_number));
+  return -1;
+}
 const struct AH_data& AH_data = *state.AH_data_array[horizon_number];
 
-assert(AH_data.ps_ptr != NULL);
+if (AH_data.ps_ptr == NULL) return -1;
 const patch_system& ps = *AH_data.ps_ptr;
 
-assert(p_origin_x != NULL);
-assert(p_origin_y != NULL);
-assert(p_origin_z != NULL);
 *p_origin_x = ps.origin_x();
 *p_origin_y = ps.origin_y();
 *p_origin_z = ps.origin_z();
@@ -126,7 +130,7 @@ if (!  ((horizon_number >= 1) && (horizon_number <= state.N_horizons))  )
 	return -1;					// *** ERROR RETURN ***
 	}
 
-assert(state.AH_data_array[horizon_number] != NULL);
+if (state.AH_data_array[horizon_number] == NULL) return -1;
 const struct AH_data& AH_data = *state.AH_data_array[horizon_number];
 
 return AH_data.found_flag ? 1 : 0;
@@ -165,13 +169,17 @@ if (!  ((horizon_number >= 1) && (horizon_number <= state.N_horizons))  )
 	return -1;					// *** ERROR RETURN ***
 	}
 
-assert(state.AH_data_array[horizon_number] != NULL);
+if (state.AH_data_array[horizon_number] == NULL ||
+    p_centroid_x == NULL || p_centroid_y == NULL || p_centroid_z == NULL) {
+  CCTK_VWarn(CCTK_WARN_ALERT, __LINE__, __FILE__, CCTK_THORNSTRING,
+             "AHFinderDirect_horizon_centroid(): invalid internal horizon "
+             "storage or null output pointer for horizon %d",
+             int(horizon_number));
+  return -1;
+}
 const struct AH_data& AH_data = *state.AH_data_array[horizon_number];
 const struct BH_diagnostics& BH_diagnostics = AH_data.BH_diagnostics;
 
-assert(p_centroid_x != NULL);
-assert(p_centroid_y != NULL);
-assert(p_centroid_z != NULL);
 if (AH_data.found_flag)
    then {
 	*p_centroid_x = BH_diagnostics.centroid_x;
@@ -223,12 +231,20 @@ extern "C"
     return -1;					// *** ERROR RETURN ***
   }
   
-  assert(state.AH_data_array[horizon_number] != NULL);
+  if (N_points < 0 || radius == NULL ||
+      (N_points > 0 && (x == NULL || y == NULL || z == NULL)) ||
+      state.AH_data_array[horizon_number] == NULL) {
+    CCTK_VWarn(CCTK_WARN_ALERT, __LINE__, __FILE__, CCTK_THORNSTRING,
+               "AHFinderDirect_radius_in_direction(): invalid point count, "
+               "array pointer, or horizon storage for horizon %d",
+               int(horizon_number));
+    return -1;
+  }
   const struct AH_data& AH_data = *state.AH_data_array[horizon_number];
   
   if (AH_data.found_flag) {
     
-    assert(AH_data.ps_ptr != NULL);
+    if (AH_data.ps_ptr == NULL) return -1;
     const patch_system& ps = *AH_data.ps_ptr;
     
     std::vector<fp> local_xs(N_points);
