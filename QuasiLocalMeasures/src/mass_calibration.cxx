@@ -35,9 +35,11 @@ extern "C" CCTK_INT QuasiLocalMeasures_MeasureInitialMasses(
   const auto *const qlm_valid = static_cast<const CCTK_INT *>(
       CCTK_VarDataPtr(cctkGH, 0,
                       "QuasiLocalMeasures::qlm_have_valid_data[0]"));
-  const auto *const qlm_mass = static_cast<const CCTK_REAL *>(
-      CCTK_VarDataPtr(cctkGH, 0, "QuasiLocalMeasures::qlm_mass[0]"));
-  if (!qlm_valid || !qlm_mass)
+  const auto *const qlm_irreducible_mass = static_cast<const CCTK_REAL *>(
+      CCTK_VarDataPtr(
+          cctkGH, 0,
+          "QuasiLocalMeasures::qlm_irreducible_mass[0]"));
+  if (!qlm_valid || !qlm_irreducible_mass)
     return -1;
 
   for (int puncture = 0; puncture < npunctures; ++puncture) {
@@ -47,9 +49,10 @@ extern "C" CCTK_INT QuasiLocalMeasures_MeasureInitialMasses(
     if (found[puncture] && stored_surface[puncture] >= 0 &&
         qlm_surface != surface_index + num_surfaces) {
       const int qlm = int(qlm_surface - surface_index);
-      if (qlm_valid[qlm] && std::isfinite(qlm_mass[qlm]) &&
-          qlm_mass[qlm] > 0.0) {
-        measured_mass[puncture] = qlm_mass[qlm];
+      if (qlm_valid[qlm] &&
+          std::isfinite(qlm_irreducible_mass[qlm]) &&
+          qlm_irreducible_mass[qlm] > 0.0) {
+        measured_mass[puncture] = qlm_irreducible_mass[qlm];
         valid[puncture] = 1;
       }
     }
