@@ -39,6 +39,8 @@
 #include <math.h>
 #include <string.h>
 
+#include <mpi.h>
+
 #include "util_Table.h"
 #include "cctk.h"
 #include "cctk_Arguments.h"
@@ -195,12 +197,20 @@ enum expansion_status
 	    jtutil::norm<fp>* mean_curvature_Theta_norms_ptr /* = NULL */)
 {
 const bool active_flag = (ps_ptr != NULL);
+// DriverInterpolate is a collective operation in CarpetX.  In particular,
+// all ranks must enter the same interpolation call even when only one rank
+// owns the horizon currently being evaluated.  Keep a local status rather
+// than returning before that collective, and use a null patch system below
+// to make an invalid local surface take the established zero-point dummy
+// path through the interpolator.
+enum expansion_status local_status = expansion_success;
+patch_system* interpolation_ps_ptr = ps_ptr;
 if (print_msg_flag)
    then CCTK_VInfo(CCTK_THORNSTRING,
 		   "   %sexpansion",
 		   active_flag ? "" : "dummy ");
 
-if (active_flag)
+if (active_flag && local_status == expansion_success)
    then {
 	//
 	// normal computation
@@ -211,20 +221,24 @@ if (active_flag)
 	// per-horizon limit into the interpolation machinery.
 	if (!h_is_finite(*ps_ptr, error_info, initial_flag,
 	                 max_allowable_radius, print_msg_flag))
-	   then return expansion_failure__surface_nonfinite;
-							// *** ERROR RETURN ***
+	   then {
+		local_status = expansion_failure__surface_nonfinite;
+		interpolation_ps_ptr = NULL;
+		}
 
 	// fill in values of all ghosted gridfns in ghost zones
-	ps_ptr->synchronize();
+	if (local_status == expansion_success)
+	   then ps_ptr->synchronize();
 
 	// set up xyz positions of grid points
-	setup_xyz_posns(*ps_ptr, print_msg_flag);
+	if (local_status == expansion_success)
+	   then setup_xyz_posns(*ps_ptr, print_msg_flag);
 	}
 
 // compute the "geometry" g_ij, K_ij, and partial_k g_ij
 if (gi.hardwire_Schwarzschild_EF_geometry)
    then {
-	if (active_flag)
+	if (active_flag && local_status == expansion_success)
 	   then Schwarzschild_EF_geometry(*ps_ptr,
 					  gi,
 					  print_msg_flag);
@@ -233,27 +247,28 @@ if (gi.hardwire_Schwarzschild_EF_geometry)
 	// this is the only function we call unconditionally; it looks at
 	// ps_ptr (non-NULL vs NULL) to choose a normal vs dummy computation
 	const enum expansion_status status
-		= interpolate_geometry(ps_ptr,
+		= interpolate_geometry(interpolation_ps_ptr,
 				       cgi, gi,
 				       error_info, initial_flag,
 				       print_msg_flag);
-	if (status != expansion_success)
-	   then return status;				// *** ERROR RETURN ***
-	if (active_flag && cgi.use_Cactus_conformal_metric)
+	if (local_status == expansion_success && status != expansion_success)
+	   then local_status = status;
+	if (active_flag && local_status == expansion_success
+	    && cgi.use_Cactus_conformal_metric)
 	   then convert_conformal_to_physical(*ps_ptr,
 					      print_msg_flag);
 	}
 
-if (active_flag)
+if (active_flag && local_status == expansion_success)
    then {
 
 
-	if (gi.check_that_geometry_is_finite
+	if (local_status == expansion_success
+	    && gi.check_that_geometry_is_finite
 	    && !geometry_is_finite(*ps_ptr,
 				   error_info, initial_flag,
 				   print_msg_flag))
-	   then return expansion_failure__geometry_nonfinite;
-							// *** ERROR RETURN ***
+	   then local_status = expansion_failure__geometry_nonfinite;
 
         // Ensure that there is a norm object
         const bool want_norms = Theta_norms_ptr;
@@ -267,18 +282,19 @@ if (active_flag)
 	// by algebraic ops and angular finite differencing
         what_to_compute this_compute_info (compute_info);
         this_compute_info.surface_selection = selection_definition;
-	if (!compute_Theta(*ps_ptr, this_compute_info,
-			   Jacobian_flag, Theta_norms_ptr,
+	if (local_status == expansion_success
+	    && !compute_Theta(*ps_ptr, this_compute_info,
+		   Jacobian_flag, Theta_norms_ptr,
                            expansion_Theta_norms_ptr,
                            inner_expansion_Theta_norms_ptr,
                            product_expansion_Theta_norms_ptr,
                            mean_curvature_Theta_norms_ptr,
 			   error_info, initial_flag,
-			   print_msg_flag))
-	   then return expansion_failure__gij_not_positive_definite;
-							// *** ERROR RETURN ***
+		   print_msg_flag))
+	   then local_status = expansion_failure__gij_not_positive_definite;
 
-        if (compute_info.surface_selection != selection_definition) {
+	if (local_status == expansion_success
+	    && compute_info.surface_selection != selection_definition) {
           //
           // Apply correction to find a surface by its areal radius
           //
@@ -346,22 +362,23 @@ if (active_flag)
             areal_radius = mean_expansion * sqrt(area / (4.0*PI));
             break;
           }
-          default:
+	  default:
             CCTK_VWarn(CCTK_WARN_ALERT, __LINE__, __FILE__,
                        CCTK_THORNSTRING,
                        "Invalid areal-radius definition %d; rejecting "
                        "this surface", int(compute_info.surface_selection));
-            return expansion_failure__invalid_configuration;
-          } // switch areal_radius_definition
-          
-          if (! ps_ptr->N_additional_points()) {
+	    local_status = expansion_failure__invalid_configuration;
+	    break;
+	  } // switch areal_radius_definition
+
+	  if (local_status == expansion_success && ! ps_ptr->N_additional_points()) {
             // calculate correction
             const fp correction
               = (- mean_expansion
                  + areal_radius - compute_info.desired_value);
             // apply correction
             ps_ptr->add_to_gridfn(-correction, gfns::gfn__Theta);
-          } else {
+	  } else if (local_status == expansion_success) {
             const int np = ps_ptr->N_grid_points();
             const int gnp = ps_ptr->ghosted_N_grid_points();
             // apply correction
@@ -372,11 +389,11 @@ if (active_flag)
               = (mean_expansion - correction
                  - areal_radius + compute_info.desired_value);
           }
-          if (want_norms) {
+	  if (local_status == expansion_success && want_norms) {
             // recalculate norms
             ps_ptr->gridfn_norms (gfns::gfn__Theta, *Theta_norms_ptr);
           } // if want_norms
-        } else {
+	} else if (local_status == expansion_success) {
           //
           // do not apply correction
           //
@@ -389,7 +406,15 @@ if (active_flag)
         } // if use-areal-radius
 	}
 
-return expansion_success;				// *** NORMAL RETURN ***
+// Do not let a status which was discovered only by the rank owning this
+// horizon change the next collective call sequence.  All ranks leave an
+// expansion phase with the same status; MPI_MAX is valid because success is
+// zero and every failure status has a positive enum value.
+int local_status_int = int(local_status);
+int global_status_int = int(expansion_success);
+MPI_Allreduce(&local_status_int, &global_status_int, 1, MPI_INT, MPI_MAX,
+              MPI_COMM_WORLD);
+return static_cast<enum expansion_status>(global_status_int);
 }
 
 //******************************************************************************
