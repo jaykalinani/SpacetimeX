@@ -267,15 +267,20 @@ if (AH_data_ptr->depends_on == 0) {
         fp const * const ox =
           static_cast<CCTK_REAL const *>
           (CCTK_VarDataPtr (cctkGH, 0, track_origin_source_x[hn]));
-        assert (ox);
         fp const * const oy =
           static_cast<CCTK_REAL const *>
           (CCTK_VarDataPtr (cctkGH, 0, track_origin_source_y[hn]));
-        assert (oy);
         fp const * const oz =
           static_cast<CCTK_REAL const *>
           (CCTK_VarDataPtr (cctkGH, 0, track_origin_source_z[hn]));
-        assert (oz);
+        if (ox == NULL || oy == NULL || oz == NULL) {
+          CCTK_VWarn(CCTK_WARN_ALERT, __LINE__, __FILE__,
+                     CCTK_THORNSTRING,
+                     "Cannot track origin for horizon %d: one or more "
+                     "configured source grid scalars are unavailable",
+                     hn);
+          return;
+        }
         if (print_algorithm_details) {
           std::cout << "AHF tracked position ox " << *ox << " oy " << *oy << " oz " << *oz << std::endl;
         }
@@ -402,26 +407,37 @@ else if (hs.has_genuine_horizons())
     const fp saved_origin_y = horizon_is_genuine ? ps_ptr->origin_y() : 0.0;
     const fp saved_origin_z = horizon_is_genuine ? ps_ptr->origin_z() : 0.0;
 
+    bool dependency_is_valid = true;
+    bool abandon_this_horizon = false;
     if (horizon_is_genuine) {
       // deal with dependent horizons
       if (AH_data_ptr->depends_on > 0) {
-        assert (AH_data_ptr->depends_on != hn);
-        assert (AH_data_ptr->depends_on < hn);
-        // check that the other horizon is on the same processor!
-        AH_data *AH_other_ptr = AH_data_array[AH_data_ptr->depends_on];
-        assert (AH_other_ptr);
-        AH_data_ptr->compute_info.desired_value
-          = AH_other_ptr->compute_info.desired_value
-          * AH_data_ptr->desired_value_factor
-          + AH_data_ptr->desired_value_offset;
-        const int gnp = ps_ptr->ghosted_N_grid_points();
-        assert (AH_other_ptr->ps_ptr->ghosted_N_grid_points() == gnp);
-        memcpy (ps_ptr->ghosted_gridfn_data(gfns::gfn__h),
-                AH_other_ptr->ps_ptr->ghosted_gridfn_data(gfns::gfn__h),
-                gnp * sizeof(fp));
-        ps_ptr->origin_x (AH_other_ptr->ps_ptr->origin_x());
-        ps_ptr->origin_y (AH_other_ptr->ps_ptr->origin_y());
-        ps_ptr->origin_z (AH_other_ptr->ps_ptr->origin_z());
+        const int other_hn = AH_data_ptr->depends_on;
+        dependency_is_valid =
+            other_hn >= 1 && other_hn < hn && other_hn <= N_horizons &&
+            AH_data_array[other_hn] != NULL &&
+            AH_data_array[other_hn]->ps_ptr != NULL && ps_ptr != NULL &&
+            AH_data_array[other_hn]->ps_ptr->ghosted_N_grid_points() ==
+                ps_ptr->ghosted_N_grid_points();
+        if (!dependency_is_valid) {
+          CCTK_VWarn(CCTK_WARN_ALERT, __LINE__, __FILE__,
+                     CCTK_THORNSTRING,
+                     "Skipping horizon %d: invalid dependency on horizon %d "
+                     "or incompatible angular grids", hn, other_hn);
+        } else {
+          AH_data *AH_other_ptr = AH_data_array[other_hn];
+          AH_data_ptr->compute_info.desired_value
+            = AH_other_ptr->compute_info.desired_value
+            * AH_data_ptr->desired_value_factor
+            + AH_data_ptr->desired_value_offset;
+          const int gnp = ps_ptr->ghosted_N_grid_points();
+          memcpy (ps_ptr->ghosted_gridfn_data(gfns::gfn__h),
+                  AH_other_ptr->ps_ptr->ghosted_gridfn_data(gfns::gfn__h),
+                  gnp * sizeof(fp));
+          ps_ptr->origin_x (AH_other_ptr->ps_ptr->origin_x());
+          ps_ptr->origin_y (AH_other_ptr->ps_ptr->origin_y());
+          ps_ptr->origin_z (AH_other_ptr->ps_ptr->origin_z());
+        }
       }
     }
 
@@ -453,11 +469,20 @@ else if (hs.has_genuine_horizons())
               }
             }
           }
-          assert (N > 0);
-          cx /= N;
-          cy /= N;
-          cz /= N;
-          sx=cx; sy=cy; sz=cz;
+          if (N == 0) {
+            CCTK_VWarn(CCTK_WARN_ALERT, __LINE__, __FILE__,
+                       CCTK_THORNSTRING,
+                       "Cannot move origin for horizon %d: surface has no "
+                       "nominal grid points", hn);
+            abandon_this_horizon = true;
+            cx = cy = cz = 0.0;
+            sx = sy = sz = 0.0;
+          } else {
+            cx /= N;
+            cy /= N;
+            cz /= N;
+            sx=cx; sy=cy; sz=cz;
+          }
         } else {                // if predict_origin_movement
           if (ah_centroid_valid[hn-1]) {
             if (verbose_info.print_algorithm_details) {
@@ -545,7 +570,15 @@ else if (hs.has_genuine_horizons())
           cx = cy = cz = 0; sx = sy = sz = 0; break;
         case patch_system::patch_system__plus_xyz_octant_rotating:
           cx = cy = cz = 0; sx = sy = sz = 0; break;
-        default: assert(0);
+        default:
+          CCTK_VWarn(CCTK_WARN_ALERT, __LINE__, __FILE__,
+                     CCTK_THORNSTRING,
+                     "Cannot constrain origin motion for horizon %d: "
+                     "invalid patch-system type %d", hn, int(ps.type()));
+          abandon_this_horizon = true;
+          cx = cy = cz = 0.0;
+          sx = sy = sz = 0.0;
+          break;
         }
         ps.origin_x (ps.origin_x() + cx);
         ps.origin_y (ps.origin_y() + cy);
@@ -675,7 +708,7 @@ else if (hs.has_genuine_horizons())
 	// on the current horizon (which might be either genuine or dummy)
 	//
         bool do_return = false;
-        bool abandon_this_horizon = false;
+        abandon_this_horizon = !dependency_is_valid;
 	for (int iteration = 1 ; ; ++iteration)
 	{
 	if (verbose_info.print_algorithm_debug)
@@ -723,6 +756,7 @@ else if (hs.has_genuine_horizons())
             = expansion(ps_ptr, compute_info,
                         cgi, gi,
                         error_info, (iteration == 1),
+                        solver_info.max_allowable_horizon_radius[hn],
                         false,	// no, we don't want Jacobian coeffs
                         false,
                         &shifted_Theta_norms,
@@ -748,6 +782,7 @@ else if (hs.has_genuine_horizons())
             = expansion(ps_ptr, compute_info,
                         cgi, gi,
                         error_info, (iteration == 1),
+                        solver_info.max_allowable_horizon_radius[hn],
                         false,	// no, we don't want Jacobian coeffs
                         false,
                         &shifted2_Theta_norms,
@@ -778,6 +813,9 @@ else if (hs.has_genuine_horizons())
                = expansion(ps_ptr, compute_info,
 			   cgi, gi,
 			   error_info, (iteration == 1),
+			   horizon_is_genuine
+			       ? solver_info.max_allowable_horizon_radius[hn]
+			       : -1.0,
 			   true,	// yes, we want Jacobian coeffs
 			   verbose_info.print_algorithm_details,
                            &Theta_norms,
@@ -1167,6 +1205,9 @@ else if (hs.has_genuine_horizons())
 		  compute_info,
 		  cgi, gi, Jacobian_info,
 		  error_info, (iteration == 1),
+		  this_horizon_needs_more_iterations
+		      ? solver_info.max_allowable_horizon_radius[hn]
+		      : -1.0,
 		  verbose_info.print_algorithm_details);
 	const bool Jacobian_is_ok = (Jacobian_status == expansion_success);
 
@@ -1268,7 +1309,19 @@ else if (hs.has_genuine_horizons())
                      "Pretracking: solving failed; backtracking");
           AH_data_ptr->ps_ptr->ghosted_gridfn_copy (gfns::gfn__save_h, gfns::gfn__h);
           if (pretracking_have_lower_bound) {
-            assert (AH_data_ptr->pretracking_value >= pretracking_lower_bound - 1.0e-10 * fabs(pretracking_lower_bound));
+            if (AH_data_ptr->pretracking_value <
+                pretracking_lower_bound -
+                    1.0e-10 * fabs(pretracking_lower_bound)) {
+              CCTK_VWarn(CCTK_WARN_ALERT, __LINE__, __FILE__,
+                         CCTK_THORNSTRING,
+                         "Pretracking bracket became inconsistent for "
+                         "horizon %d; abandoning pretracking", hn);
+              I_am_pretracking = false;
+              I_was_pretracking = true;
+              pretracking_was_successful = false;
+              AH_data_ptr->pretracking_value = old_pretracking_value;
+              break;
+            }
           }
           pretracking_have_lower_bound = true;
           pretracking_lower_bound = AH_data_ptr->pretracking_value;
@@ -1310,7 +1363,17 @@ else if (hs.has_genuine_horizons())
         } else {
           // the surface was okay
           // get mean expansion
-          assert (pretracking_have_horizon_info);
+          if (!pretracking_have_horizon_info) {
+            CCTK_VWarn(CCTK_WARN_ALERT, __LINE__, __FILE__,
+                       CCTK_THORNSTRING,
+                       "Pretracking found horizon %d without valid horizon "
+                       "information; abandoning pretracking", hn);
+            I_am_pretracking = false;
+            I_was_pretracking = true;
+            pretracking_was_successful = false;
+            AH_data_ptr->pretracking_value = old_pretracking_value;
+            break;
+          }
           CCTK_VInfo(CCTK_THORNSTRING,
                      "Pretracking: solving succeeded; expansion is now %g",
                      double(pretracking_mean_expansion));
@@ -1318,7 +1381,15 @@ else if (hs.has_genuine_horizons())
           if (AH_data_ptr->pretracking_value > AH_data_ptr->pretracking_minimum_value + 1.0e-10 * AH_data_ptr->pretracking_minimum_delta) {
             // it is not yet a horizon
             if (pretracking_have_upper_bound) {
-              assert (AH_data_ptr->pretracking_value <= pretracking_upper_bound + 1.0e-10 * fabs(pretracking_upper_bound));
+              if (AH_data_ptr->pretracking_value >
+                  pretracking_upper_bound +
+                      1.0e-10 * fabs(pretracking_upper_bound)) {
+                CCTK_VWarn(CCTK_WARN_ALERT, __LINE__, __FILE__,
+                           CCTK_THORNSTRING,
+                           "Pretracking upper bracket became inconsistent "
+                           "for horizon %d; rebuilding the bracket", hn);
+                pretracking_have_upper_bound = false;
+              }
             }
             pretracking_have_upper_bound = true;
             pretracking_upper_bound = AH_data_ptr->pretracking_value;

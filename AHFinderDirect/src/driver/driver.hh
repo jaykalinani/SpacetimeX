@@ -435,7 +435,7 @@ bool same_parent_group(const std::vector<int>& parents_a,
 		       const std::vector<int>& parents_b);
 int find_horizon_with_parent_group(const std::vector<int>& parent_horizons);
 int find_unused_horizon_slot();
-void initialize_candidate_slot(CCTK_ARGUMENTS, int candidate_hn,
+bool initialize_candidate_slot(CCTK_ARGUMENTS, int candidate_hn,
 	const std::vector<int>& parent_horizons, fp candidate_origin_x,
 	fp candidate_origin_y, fp candidate_origin_z, fp candidate_radius,
 	enum candidate_discovery_method candidate_method);

@@ -96,7 +96,7 @@ void do_test_expansion_Jacobians(int my_proc, int N_horizons,
 				 const struct error_info& error_info,
 				 const struct verbose_info& verbose_info,
 				 int timer_handle);
-void promote_candidate_slot(int candidate_hn);
+bool promote_candidate_slot(int candidate_hn);
 bool recognize_common_parent_surface(
     int candidate_hn, fp centroid_tolerance, fp area_tolerance,
     fp mass_min_fraction, fp mass_max_fraction);
@@ -213,12 +213,18 @@ void set_initial_guess_center(struct initial_guess_info& guess,
 void set_search_origins_from_punctures(CCTK_ARGUMENTS)
 {
   DECLARE_CCTK_ARGUMENTS_AHFinderDirect_find_horizons;
+  DECLARE_CCTK_PARAMETERS;
 
   if (pt_num_tracked == NULL || pt_loc_x == NULL || pt_loc_y == NULL ||
       pt_loc_z == NULL) {
-    CCTK_VWarn(FATAL_ERROR, __LINE__, __FILE__, CCTK_THORNSTRING,
+    CCTK_VWarn(CCTK_WARN_ALERT, __LINE__, __FILE__, CCTK_THORNSTRING,
+               "Skipping AH searches on this call: "
                "AH_set_origins_to_punctures requires initialized "
                "PunctureTracker variables");
+    for (int hn = 1; hn <= state.N_horizons; ++hn) {
+      state.AH_data_array[hn]->search_flag = false;
+    }
+    return;
   }
   const CCTK_INT ntracked = pt_num_tracked[0];
 
@@ -232,10 +238,21 @@ void set_search_origins_from_punctures(CCTK_ARGUMENTS)
     origin_estimate estimate;
     if (!hierarchical_origin(hn, ntracked, pt_loc_x, pt_loc_y, pt_loc_z,
                              visiting, estimate)) {
-      CCTK_VWarn(FATAL_ERROR, __LINE__, __FILE__, CCTK_THORNSTRING,
-                 "Cannot determine a puncture-based search origin for "
-                 "horizon %d (status=%d, tracked punctures=%d)",
+      if (horizon.status == horizon_status__candidate) {
+        CCTK_VWarn(CCTK_WARN_ALERT, __LINE__, __FILE__, CCTK_THORNSTRING,
+                   "Releasing candidate horizon %d: cannot determine a "
+                   "current puncture-based search origin (tracked "
+                   "punctures=%d)", hn, int(ntracked));
+        reset_candidate_slot(CCTK_PASS_CTOC, hn);
+        continue;
+      }
+      CCTK_VWarn(CCTK_WARN_ALERT, __LINE__, __FILE__, CCTK_THORNSTRING,
+                 "Skipping horizon %d on this call: cannot determine a "
+                 "puncture-based search origin (status=%d, tracked "
+                 "punctures=%d)",
                  hn, int(horizon.status), int(ntracked));
+      horizon.search_flag = false;
+      continue;
     }
 
     patch_system& ps = *horizon.ps_ptr;
@@ -254,6 +271,47 @@ void set_search_origins_from_punctures(CCTK_ARGUMENTS)
     ps.origin_z(estimate.z);
     set_initial_guess_center(horizon.initial_guess_info,
                              estimate.x, estimate.y, estimate.z);
+
+    // Keep the expected moving-puncture-gauge radius as the baseline, but do
+    // not start a dynamical merger candidate from a sphere which excludes a
+    // live parent centre.  Use the same puncture hierarchy for both the
+    // centre and radius so stale AH centroids cannot make them inconsistent.
+    if (horizon.status == horizon_status__candidate &&
+        horizon.initial_guess_info.method == initial_guess__coord_sphere) {
+      const fp expected_radius = merger_pre_factor * horizon.mass;
+      fp enclosing_radius = 0.0;
+      bool have_all_parents = true;
+      for (std::vector<int>::const_iterator parent_hn =
+               horizon.parent_horizons.begin();
+           parent_hn != horizon.parent_horizons.end(); ++parent_hn) {
+        std::vector<bool> parent_visiting(state.N_horizons + 1, false);
+        origin_estimate parent;
+        if (!hierarchical_origin(*parent_hn, ntracked, pt_loc_x, pt_loc_y,
+                                 pt_loc_z, parent_visiting, parent)) {
+          have_all_parents = false;
+          break;
+        }
+        const fp dx = parent.x - estimate.x;
+        const fp dy = parent.y - estimate.y;
+        const fp dz = parent.z - estimate.z;
+        enclosing_radius =
+            std::max(enclosing_radius, sqrt(dx*dx + dy*dy + dz*dz));
+      }
+      if (have_all_parents) {
+        const fp parent_margin = 1.05;
+        const fp adjusted_radius =
+            std::max(expected_radius, parent_margin * enclosing_radius);
+        if (state.my_proc == 0 &&
+            adjusted_radius > expected_radius * (1.0 + 1.0e-12)) {
+          CCTK_VInfo(CCTK_THORNSTRING,
+                     "Enlarging candidate horizon %d initial radius from "
+                     "the expected value %.17g to %.17g to enclose its "
+                     "live parent centres",
+                     hn, double(expected_radius), double(adjusted_radius));
+        }
+        horizon.initial_guess_info.coord_sphere_info.radius = adjusted_radius;
+      }
+    }
     if (state.my_proc == 0 && state.verbose_info.print_physics_details) {
       CCTK_VInfo(CCTK_THORNSTRING,
                  "Horizon %d search origin set from puncture hierarchy to "
@@ -269,22 +327,24 @@ void set_search_origins_from_punctures(CCTK_ARGUMENTS)
 //******************************************************************************
 
 namespace {
-void promote_candidate_slot(const int candidate_hn)
+bool promote_candidate_slot(const int candidate_hn)
 {
   struct AH_data& candidate = *state.AH_data_array[candidate_hn];
 
   if (candidate.status != horizon_status__candidate ||
       !candidate.found_flag || candidate.has_been_found) {
-    CCTK_VWarn(FATAL_ERROR, __LINE__, __FILE__, CCTK_THORNSTRING,
+    CCTK_VWarn(CCTK_WARN_ALERT, __LINE__, __FILE__, CCTK_THORNSTRING,
                "Cannot promote horizon %d: status=%d, found=%d, "
                "has_been_found=%d",
                candidate_hn, int(candidate.status),
                int(candidate.found_flag), int(candidate.has_been_found));
+    return false;
   }
   if (candidate.parent_horizons.size() < 2) {
-    CCTK_VWarn(FATAL_ERROR, __LINE__, __FILE__, CCTK_THORNSTRING,
+    CCTK_VWarn(CCTK_WARN_ALERT, __LINE__, __FILE__, CCTK_THORNSTRING,
                "Cannot promote candidate horizon %d with fewer than two parents",
                candidate_hn);
+    return false;
   }
 
   // Validate the complete relationship before changing any slot, so a bad
@@ -294,21 +354,23 @@ void promote_candidate_slot(const int candidate_hn)
        parent_hn != candidate.parent_horizons.end(); ++parent_hn) {
     if (*parent_hn < 1 || *parent_hn > state.N_horizons ||
         *parent_hn == candidate_hn) {
-      CCTK_VWarn(FATAL_ERROR, __LINE__, __FILE__, CCTK_THORNSTRING,
+      CCTK_VWarn(CCTK_WARN_ALERT, __LINE__, __FILE__, CCTK_THORNSTRING,
                  "Candidate horizon %d has invalid parent horizon %d",
                  candidate_hn, *parent_hn);
+      return false;
     }
     const struct AH_data& parent = *state.AH_data_array[*parent_hn];
     if (!parent.has_been_found ||
         (parent.status != horizon_status__individual &&
          parent.status != horizon_status__confirmed) ||
         parent.inside_confirmed_merger) {
-      CCTK_VWarn(FATAL_ERROR, __LINE__, __FILE__, CCTK_THORNSTRING,
+      CCTK_VWarn(CCTK_WARN_ALERT, __LINE__, __FILE__, CCTK_THORNSTRING,
                  "Candidate horizon %d has ineligible parent horizon %d "
                  "(status=%d, has_been_found=%d, inside_merger=%d)",
                  candidate_hn, *parent_hn, int(parent.status),
                  int(parent.has_been_found),
                  int(parent.inside_confirmed_merger));
+      return false;
     }
   }
 
@@ -334,6 +396,7 @@ void promote_candidate_slot(const int candidate_hn)
                "Promoted candidate horizon %d to a confirmed horizon",
                candidate_hn);
   }
+  return true;
 }
 }
 
@@ -357,11 +420,12 @@ bool recognize_common_parent_surface(
   }
   if (centroid_tolerance < 0.0 || area_tolerance < 0.0 ||
       mass_min_fraction < 0.0 || mass_max_fraction < mass_min_fraction) {
-    CCTK_VWarn(FATAL_ERROR, __LINE__, __FILE__, CCTK_THORNSTRING,
+    CCTK_VWarn(CCTK_WARN_ALERT, __LINE__, __FILE__, CCTK_THORNSTRING,
                "Invalid common-parent-surface tolerances: centroid=%g, "
                "area=%g, mass=[%g,%g]",
                double(centroid_tolerance), double(area_tolerance),
                double(mass_min_fraction), double(mass_max_fraction));
+    return false;
   }
   if (!std::isfinite(candidate.mass) || candidate.mass <= 0.0) {
     return false;
@@ -483,9 +547,10 @@ void write_merger_event(CCTK_ARGUMENTS, const int daughter_hn)
   if (daughter.status != horizon_status__confirmed ||
       !daughter.has_been_found ||
       daughter.parent_horizons.size() < 2) {
-    CCTK_VWarn(FATAL_ERROR, __LINE__, __FILE__, CCTK_THORNSTRING,
-               "Cannot write merger event for invalid daughter horizon %d",
+    CCTK_VWarn(CCTK_WARN_ALERT, __LINE__, __FILE__, CCTK_THORNSTRING,
+               "Skipping merger-event output for invalid daughter horizon %d",
                daughter_hn);
+    return;
   }
   if (daughter.merger_event_written) {
     return;
@@ -496,9 +561,10 @@ void write_merger_event(CCTK_ARGUMENTS, const int daughter_hn)
     const int directory_status =
         CCTK_CreateDirectory(IO_info::default_directory_permission, directory);
     if (directory_status < 0) {
-      CCTK_VWarn(FATAL_ERROR, __LINE__, __FILE__, CCTK_THORNSTRING,
+      CCTK_VWarn(CCTK_WARN_ALERT, __LINE__, __FILE__, CCTK_THORNSTRING,
                  "Error %d creating merger-event output directory \"%s\"",
                  directory_status, directory);
+      return;
     }
 
     char file_name[IO_info::file_name_buffer_size];
@@ -524,12 +590,13 @@ void write_merger_event(CCTK_ARGUMENTS, const int daughter_hn)
                 "iteration", "time", "daughter", "discovery_method",
                 "nparents", "parent_horizons...");
         if (fclose(initialize_file) != 0) {
-          CCTK_VWarn(FATAL_ERROR, __LINE__, __FILE__, CCTK_THORNSTRING,
+          CCTK_VWarn(CCTK_WARN_ALERT, __LINE__, __FILE__, CCTK_THORNSTRING,
                      "Error closing merger-event file \"%s\"", file_name);
         }
       } else if (truncate_file) {
-        CCTK_VWarn(FATAL_ERROR, __LINE__, __FILE__, CCTK_THORNSTRING,
+        CCTK_VWarn(CCTK_WARN_ALERT, __LINE__, __FILE__, CCTK_THORNSTRING,
                    "Cannot create merger-event file \"%s\"", file_name);
+        return;
       }
       state.merger_event_file_initialized = true;
     }
@@ -558,8 +625,9 @@ void write_merger_event(CCTK_ARGUMENTS, const int daughter_hn)
     if (!daughter_already_recorded) {
       FILE* append_file = fopen(file_name, "a");
       if (append_file == NULL) {
-        CCTK_VWarn(FATAL_ERROR, __LINE__, __FILE__, CCTK_THORNSTRING,
+        CCTK_VWarn(CCTK_WARN_ALERT, __LINE__, __FILE__, CCTK_THORNSTRING,
                    "Cannot append to merger-event file \"%s\"", file_name);
+        return;
       }
       fprintf(append_file, "  %-10d %-24.17g %-10d %-18d %-10d",
               int(cctk_iteration), double(cctk_time), daughter_hn,
@@ -572,7 +640,7 @@ void write_merger_event(CCTK_ARGUMENTS, const int daughter_hn)
       }
       fprintf(append_file, "\n");
       if (fclose(append_file) != 0) {
-        CCTK_VWarn(FATAL_ERROR, __LINE__, __FILE__, CCTK_THORNSTRING,
+        CCTK_VWarn(CCTK_WARN_ALERT, __LINE__, __FILE__, CCTK_THORNSTRING,
                    "Error closing merger-event file \"%s\"", file_name);
       }
     }
@@ -636,6 +704,15 @@ void discover_method1_mergers(CCTK_ARGUMENTS)
     return;
   }
 
+  if (pt_num_tracked == NULL || pt_loc_x == NULL || pt_loc_y == NULL ||
+      pt_loc_z == NULL) {
+    CCTK_VWarn(CCTK_WARN_ALERT, __LINE__, __FILE__, CCTK_THORNSTRING,
+               "Skipping Method #1 merger discovery: PunctureTracker "
+               "variables are not initialized");
+    return;
+  }
+  const CCTK_INT ntracked = pt_num_tracked[0];
+
   if (state.my_proc == 0) {
     CCTK_VInfo(CCTK_THORNSTRING,
                "Merger discovery Method #1 starting at iteration %d",
@@ -645,22 +722,33 @@ void discover_method1_mergers(CCTK_ARGUMENTS)
   // The eligible horizons are the current outer frontier of the merger tree:
   // real horizons which have not already been enclosed by a confirmed child.
   std::vector<int> eligible;
+  std::vector<origin_estimate> eligible_origins;
   for (int hn = 1; hn <= N_horizons; ++hn) {
     const struct AH_data& AH_data = *state.AH_data_array[hn];
     if (AH_data.has_been_found &&
         !AH_data.inside_confirmed_merger &&
         (AH_data.status == horizon_status__individual ||
          AH_data.status == horizon_status__confirmed)) {
+      std::vector<bool> visiting(state.N_horizons + 1, false);
+      origin_estimate live_origin;
+      if (!hierarchical_origin(hn, ntracked, pt_loc_x, pt_loc_y, pt_loc_z,
+                               visiting, live_origin)) {
+        CCTK_VWarn(CCTK_WARN_ALERT, __LINE__, __FILE__, CCTK_THORNSTRING,
+                   "Excluding horizon %d from Method #1 merger discovery: "
+                   "cannot determine its current puncture-based position",
+                   hn);
+        continue;
+      }
       eligible.push_back(hn);
+      eligible_origins.push_back(live_origin);
       if (state.my_proc == 0) {
         CCTK_VInfo(
             CCTK_THORNSTRING,
             "Method #1 eligible AH %d: has_been_found=%s, status=%d, "
-            "centroid=(%.17g,%.17g,%.17g), puncture_mass=%.17g",
+            "live_origin=(%.17g,%.17g,%.17g), puncture_mass=%.17g",
             hn, AH_data.has_been_found ? "yes" : "no", int(AH_data.status),
-            double(AH_data.BH_diagnostics.centroid_x),
-            double(AH_data.BH_diagnostics.centroid_y),
-            double(AH_data.BH_diagnostics.centroid_z),
+            double(live_origin.x), double(live_origin.y),
+            double(live_origin.z),
             double(AH_data.mass));
       }
     }
@@ -672,12 +760,9 @@ void discover_method1_mergers(CCTK_ARGUMENTS)
     const struct AH_data& AH_i = *state.AH_data_array[eligible[i]];
     for (int j = i + 1; j < neligible; ++j) {
       const struct AH_data& AH_j = *state.AH_data_array[eligible[j]];
-      const fp dx = AH_i.BH_diagnostics.centroid_x -
-                    AH_j.BH_diagnostics.centroid_x;
-      const fp dy = AH_i.BH_diagnostics.centroid_y -
-                    AH_j.BH_diagnostics.centroid_y;
-      const fp dz = AH_i.BH_diagnostics.centroid_z -
-                    AH_j.BH_diagnostics.centroid_z;
+      const fp dx = eligible_origins[i].x - eligible_origins[j].x;
+      const fp dy = eligible_origins[i].y - eligible_origins[j].y;
+      const fp dz = eligible_origins[i].z - eligible_origins[j].z;
       const fp distance = sqrt(dx*dx + dy*dy + dz*dz);
       const fp min_distance =
           4.0 * merger_search_factor * (AH_i.mass + AH_j.mass);
@@ -794,29 +879,60 @@ void discover_method1_mergers(CCTK_ARGUMENTS)
     fp center_x = 0.0;
     fp center_y = 0.0;
     fp center_z = 0.0;
+    std::vector<origin_estimate> parent_origins;
+    bool valid_group = true;
     for (std::vector<int>::const_iterator parent_hn = group->begin();
          parent_hn != group->end(); ++parent_hn) {
       const struct AH_data& parent = *state.AH_data_array[*parent_hn];
+      std::vector<bool> visiting(state.N_horizons + 1, false);
+      origin_estimate live_origin;
+      if (!hierarchical_origin(*parent_hn, ntracked, pt_loc_x, pt_loc_y,
+                               pt_loc_z, visiting, live_origin)) {
+        CCTK_VWarn(CCTK_WARN_ALERT, __LINE__, __FILE__, CCTK_THORNSTRING,
+                   "Rejecting Method #1 candidate group: cannot determine "
+                   "the current puncture-based position of parent horizon %d",
+                   *parent_hn);
+        valid_group = false;
+        break;
+      }
+      parent_origins.push_back(live_origin);
       total_mass += parent.mass;
-      center_x += parent.mass * parent.BH_diagnostics.centroid_x;
-      center_y += parent.mass * parent.BH_diagnostics.centroid_y;
-      center_z += parent.mass * parent.BH_diagnostics.centroid_z;
+      center_x += parent.mass * live_origin.x;
+      center_y += parent.mass * live_origin.y;
+      center_z += parent.mass * live_origin.z;
+    }
+    if (!valid_group) {
+      continue;
     }
     if (!isfinite(total_mass) || total_mass <= 0.0) {
-      CCTK_VWarn(FATAL_ERROR, __LINE__, __FILE__, CCTK_THORNSTRING,
-                 "Method #1 proposed a merger group with invalid total "
+      CCTK_VWarn(CCTK_WARN_ALERT, __LINE__, __FILE__, CCTK_THORNSTRING,
+                 "Rejecting Method #1 merger group with invalid total "
                  "puncture mass %g",
                  double(total_mass));
+      continue;
     }
     center_x /= total_mass;
     center_y /= total_mass;
     center_z /= total_mass;
-    const fp candidate_radius = merger_pre_factor * total_mass;
+    const fp expected_radius = merger_pre_factor * total_mass;
+    fp enclosing_radius = 0.0;
+    for (std::vector<origin_estimate>::const_iterator parent =
+             parent_origins.begin(); parent != parent_origins.end(); ++parent) {
+      const fp dx = parent->x - center_x;
+      const fp dy = parent->y - center_y;
+      const fp dz = parent->z - center_z;
+      enclosing_radius = std::max(enclosing_radius,
+                                  sqrt(dx * dx + dy * dy + dz * dz));
+    }
+    const fp candidate_radius =
+        std::max(expected_radius, fp(1.05) * enclosing_radius);
 
-    initialize_candidate_slot(
-        CCTK_PASS_CTOC, candidate_hn, *group,
-        center_x, center_y, center_z, candidate_radius,
-        candidate_discovery_method__method1);
+    if (!initialize_candidate_slot(
+            CCTK_PASS_CTOC, candidate_hn, *group,
+            center_x, center_y, center_z, candidate_radius,
+            candidate_discovery_method__method1)) {
+      continue;
+    }
     // Discovery is performed only on a horizon-finder iteration.  Make the
     // newly initialized candidate participate in the Newton solve later in
     // this same call, independently of the timing parameters attached to its
@@ -867,6 +983,15 @@ void discover_method2_mergers(CCTK_ARGUMENTS)
     return;
   }
 
+  if (pt_num_tracked == NULL || pt_loc_x == NULL || pt_loc_y == NULL ||
+      pt_loc_z == NULL) {
+    CCTK_VWarn(CCTK_WARN_ALERT, __LINE__, __FILE__, CCTK_THORNSTRING,
+               "Skipping Method #2 merger discovery: PunctureTracker "
+               "variables are not initialized");
+    return;
+  }
+  const CCTK_INT ntracked = pt_num_tracked[0];
+
   if (state.my_proc == 0) {
     CCTK_VInfo(CCTK_THORNSTRING,
                "Merger discovery Method #2 starting at iteration %d",
@@ -874,12 +999,22 @@ void discover_method2_mergers(CCTK_ARGUMENTS)
   }
 
   std::vector<int> eligible;
+  std::vector<origin_estimate> current_origins(N_horizons + 1);
   for (int hn = 1; hn <= N_horizons; ++hn) {
     const struct AH_data& AH_data = *state.AH_data_array[hn];
     if (AH_data.has_been_found &&
         !AH_data.inside_confirmed_merger &&
         (AH_data.status == horizon_status__individual ||
          AH_data.status == horizon_status__confirmed)) {
+      std::vector<bool> visiting(state.N_horizons + 1, false);
+      if (!hierarchical_origin(hn, ntracked, pt_loc_x, pt_loc_y, pt_loc_z,
+                               visiting, current_origins[hn])) {
+        CCTK_VWarn(CCTK_WARN_ALERT, __LINE__, __FILE__, CCTK_THORNSTRING,
+                   "Excluding horizon %d from Method #2 merger discovery: "
+                   "cannot determine its current puncture-based position",
+                   hn);
+        continue;
+      }
       eligible.push_back(hn);
     }
   }
@@ -931,32 +1066,32 @@ void discover_method2_mergers(CCTK_ARGUMENTS)
         total_mass += state.AH_data_array[*parent_hn]->mass;
       }
       if (!isfinite(total_mass) || total_mass <= 0.0) {
-        CCTK_VWarn(FATAL_ERROR, __LINE__, __FILE__, CCTK_THORNSTRING,
-                   "Method #2 proposed a group with invalid total proxy "
+        CCTK_VWarn(CCTK_WARN_ALERT, __LINE__, __FILE__, CCTK_THORNSTRING,
+                   "Rejecting Method #2 merger group with invalid total proxy "
                    "puncture mass %g",
                    double(total_mass));
+        return;
       }
 
       const fp pair_limit =
           4.0 * merger_compact_search_factor * total_mass;
       for (std::vector<int>::size_type i = 0; i < group.size(); ++i) {
-        const struct BH_diagnostics& di =
-            state.AH_data_array[group[i]]->BH_diagnostics;
+        const origin_estimate& pi = current_origins[group[i]];
         for (std::vector<int>::size_type j = i + 1;
              j < group.size(); ++j) {
-          const struct BH_diagnostics& dj =
-              state.AH_data_array[group[j]]->BH_diagnostics;
-          const fp dx = di.centroid_x - dj.centroid_x;
-          const fp dy = di.centroid_y - dj.centroid_y;
-          const fp dz = di.centroid_z - dj.centroid_z;
+          const origin_estimate& pj = current_origins[group[j]];
+          const fp dx = pi.x - pj.x;
+          const fp dy = pi.y - pj.y;
+          const fp dz = pi.z - pj.z;
           if (sqrt(dx*dx + dy*dy + dz*dz) > pair_limit) {
             return;
           }
         }
       }
 
-      // Treat each horizon as a ball about its patch origin with radius
-      // max_radius.  The midpoint of their combined axis-aligned bounding box
+      // Treat each horizon as a ball about its current puncture-derived
+      // position with its last measured max_radius.  The midpoint of their
+      // combined axis-aligned bounding box
       // supplies a deterministic trial center; max(|center-origin_i| +
       // max_radius_i) is a conservative sphere enclosing all those balls.
       fp min_x = 0.0, max_x = 0.0;
@@ -965,25 +1100,28 @@ void discover_method2_mergers(CCTK_ARGUMENTS)
       for (std::vector<int>::size_type i = 0; i < group.size(); ++i) {
         const struct BH_diagnostics& d =
             state.AH_data_array[group[i]]->BH_diagnostics;
+        const origin_estimate& p = current_origins[group[i]];
         if (!isfinite(d.max_radius) || d.max_radius < 0.0) {
-          CCTK_VWarn(FATAL_ERROR, __LINE__, __FILE__, CCTK_THORNSTRING,
-                     "Method #2 parent horizon %d has invalid max_radius %g",
+          CCTK_VWarn(CCTK_WARN_ALERT, __LINE__, __FILE__, CCTK_THORNSTRING,
+                     "Rejecting Method #2 group: parent horizon %d has "
+                     "invalid max_radius %g",
                      group[i], double(d.max_radius));
+          return;
         }
         if (i == 0) {
-          min_x = d.origin_x - d.max_radius;
-          max_x = d.origin_x + d.max_radius;
-          min_y = d.origin_y - d.max_radius;
-          max_y = d.origin_y + d.max_radius;
-          min_z = d.origin_z - d.max_radius;
-          max_z = d.origin_z + d.max_radius;
+          min_x = p.x - d.max_radius;
+          max_x = p.x + d.max_radius;
+          min_y = p.y - d.max_radius;
+          max_y = p.y + d.max_radius;
+          min_z = p.z - d.max_radius;
+          max_z = p.z + d.max_radius;
         } else {
-          min_x = std::min(min_x, d.origin_x - d.max_radius);
-          max_x = std::max(max_x, d.origin_x + d.max_radius);
-          min_y = std::min(min_y, d.origin_y - d.max_radius);
-          max_y = std::max(max_y, d.origin_y + d.max_radius);
-          min_z = std::min(min_z, d.origin_z - d.max_radius);
-          max_z = std::max(max_z, d.origin_z + d.max_radius);
+          min_x = std::min(min_x, p.x - d.max_radius);
+          max_x = std::max(max_x, p.x + d.max_radius);
+          min_y = std::min(min_y, p.y - d.max_radius);
+          max_y = std::max(max_y, p.y + d.max_radius);
+          min_z = std::min(min_z, p.z - d.max_radius);
+          max_z = std::max(max_z, p.z + d.max_radius);
         }
       }
       const fp center_x = 0.5 * (min_x + max_x);
@@ -994,9 +1132,10 @@ void discover_method2_mergers(CCTK_ARGUMENTS)
            parent_hn != group.end(); ++parent_hn) {
         const struct BH_diagnostics& d =
             state.AH_data_array[*parent_hn]->BH_diagnostics;
-        const fp dx = center_x - d.origin_x;
-        const fp dy = center_y - d.origin_y;
-        const fp dz = center_z - d.origin_z;
+        const origin_estimate& p = current_origins[*parent_hn];
+        const fp dx = center_x - p.x;
+        const fp dy = center_y - p.y;
+        const fp dz = center_z - p.z;
         enclosing_radius =
             std::max(enclosing_radius,
                      sqrt(dx*dx + dy*dy + dz*dz) + d.max_radius);
@@ -1019,11 +1158,15 @@ void discover_method2_mergers(CCTK_ARGUMENTS)
         return;
       }
 
-      const fp candidate_radius = merger_pre_factor * total_mass;
-      initialize_candidate_slot(
-          CCTK_PASS_CTOC, candidate_hn, group,
-          center_x, center_y, center_z, candidate_radius,
-          candidate_discovery_method__method2);
+      const fp candidate_radius =
+          std::max(merger_pre_factor * total_mass,
+                   fp(1.05) * enclosing_radius);
+      if (!initialize_candidate_slot(
+              CCTK_PASS_CTOC, candidate_hn, group,
+              center_x, center_y, center_z, candidate_radius,
+              candidate_discovery_method__method2)) {
+        return;
+      }
       state.AH_data_array[candidate_hn]->search_flag = true;
       ++active_candidates;
 
@@ -1051,6 +1194,15 @@ void release_merger_candidates(CCTK_ARGUMENTS)
   DECLARE_CCTK_ARGUMENTS;
   DECLARE_CCTK_PARAMETERS;
 
+  if (pt_num_tracked == NULL || pt_loc_x == NULL || pt_loc_y == NULL ||
+      pt_loc_z == NULL) {
+    CCTK_VWarn(CCTK_WARN_ALERT, __LINE__, __FILE__, CCTK_THORNSTRING,
+               "Skipping merger-candidate release checks: PunctureTracker "
+               "variables are not initialized");
+    return;
+  }
+  const CCTK_INT ntracked = pt_num_tracked[0];
+
   std::vector<int> candidates_to_reset;
   for (int candidate_hn = 1; candidate_hn <= N_horizons; ++candidate_hn) {
     struct AH_data& candidate = *state.AH_data_array[candidate_hn];
@@ -1059,16 +1211,39 @@ void release_merger_candidates(CCTK_ARGUMENTS)
     }
 
     bool group_is_active = candidate.parent_horizons.size() >= 2;
+    std::vector<origin_estimate> parent_origins;
     for (std::vector<int>::const_iterator parent_hn =
              candidate.parent_horizons.begin();
          group_is_active && parent_hn != candidate.parent_horizons.end();
          ++parent_hn) {
+      if (*parent_hn < 1 || *parent_hn > N_horizons ||
+          *parent_hn == candidate_hn) {
+        CCTK_VWarn(CCTK_WARN_ALERT, __LINE__, __FILE__, CCTK_THORNSTRING,
+                   "Releasing candidate horizon %d with invalid parent "
+                   "horizon %d", candidate_hn, *parent_hn);
+        group_is_active = false;
+        break;
+      }
       const struct AH_data& parent = *state.AH_data_array[*parent_hn];
       group_is_active =
           parent.has_been_found &&
           !parent.inside_confirmed_merger &&
           (parent.status == horizon_status__individual ||
            parent.status == horizon_status__confirmed);
+      if (group_is_active) {
+        std::vector<bool> visiting(state.N_horizons + 1, false);
+        origin_estimate live_origin;
+        if (!hierarchical_origin(*parent_hn, ntracked, pt_loc_x, pt_loc_y,
+                                 pt_loc_z, visiting, live_origin)) {
+          CCTK_VWarn(CCTK_WARN_ALERT, __LINE__, __FILE__, CCTK_THORNSTRING,
+                     "Releasing candidate horizon %d: cannot determine "
+                     "the current puncture-based position of parent %d",
+                     candidate_hn, *parent_hn);
+          group_is_active = false;
+        } else {
+          parent_origins.push_back(live_origin);
+        }
+      }
     }
 
     if (group_is_active &&
@@ -1090,12 +1265,9 @@ void release_merger_candidates(CCTK_ARGUMENTS)
           }
           const struct AH_data& AH_j =
               *state.AH_data_array[candidate.parent_horizons[j]];
-          const fp dx = AH_i.BH_diagnostics.centroid_x -
-                        AH_j.BH_diagnostics.centroid_x;
-          const fp dy = AH_i.BH_diagnostics.centroid_y -
-                        AH_j.BH_diagnostics.centroid_y;
-          const fp dz = AH_i.BH_diagnostics.centroid_z -
-                        AH_j.BH_diagnostics.centroid_z;
+          const fp dx = parent_origins[i].x - parent_origins[j].x;
+          const fp dy = parent_origins[i].y - parent_origins[j].y;
+          const fp dz = parent_origins[i].z - parent_origins[j].z;
           const fp distance = sqrt(dx*dx + dy*dy + dz*dz);
           const fp release_distance =
               4.0 * merger_release_factor * merger_search_factor *
@@ -1124,53 +1296,70 @@ void release_merger_candidates(CCTK_ARGUMENTS)
           merger_compact_search_factor * total_mass;
       for (std::vector<int>::size_type i = 0;
            group_is_active && i < candidate.parent_horizons.size(); ++i) {
-        const struct BH_diagnostics& di =
-            state.AH_data_array[candidate.parent_horizons[i]]->BH_diagnostics;
+        const origin_estimate& pi = parent_origins[i];
         for (std::vector<int>::size_type j = i + 1;
              group_is_active && j < candidate.parent_horizons.size(); ++j) {
-          const struct BH_diagnostics& dj =
-              state.AH_data_array[candidate.parent_horizons[j]]->BH_diagnostics;
-          const fp dx = di.centroid_x - dj.centroid_x;
-          const fp dy = di.centroid_y - dj.centroid_y;
-          const fp dz = di.centroid_z - dj.centroid_z;
+          const origin_estimate& pj = parent_origins[j];
+          const fp dx = pi.x - pj.x;
+          const fp dy = pi.y - pj.y;
+          const fp dz = pi.z - pj.z;
           group_is_active =
               sqrt(dx*dx + dy*dy + dz*dz) <= pair_limit;
         }
       }
 
       if (group_is_active) {
+        for (std::vector<int>::size_type i = 0;
+             i < candidate.parent_horizons.size(); ++i) {
+          const struct BH_diagnostics& d = state.AH_data_array[
+              candidate.parent_horizons[i]]->BH_diagnostics;
+          if (!std::isfinite(d.max_radius) || d.max_radius < 0.0) {
+            CCTK_VWarn(CCTK_WARN_ALERT, __LINE__, __FILE__,
+                       CCTK_THORNSTRING,
+                       "Releasing candidate horizon %d: parent horizon %d "
+                       "has invalid max_radius %g",
+                       candidate_hn, candidate.parent_horizons[i],
+                       double(d.max_radius));
+            group_is_active = false;
+            break;
+          }
+        }
+      }
+
+      if (group_is_active) {
         const struct BH_diagnostics& first =
             state.AH_data_array[candidate.parent_horizons[0]]->BH_diagnostics;
-        fp min_x = first.origin_x - first.max_radius;
-        fp max_x = first.origin_x + first.max_radius;
-        fp min_y = first.origin_y - first.max_radius;
-        fp max_y = first.origin_y + first.max_radius;
-        fp min_z = first.origin_z - first.max_radius;
-        fp max_z = first.origin_z + first.max_radius;
+        fp min_x = parent_origins[0].x - first.max_radius;
+        fp max_x = parent_origins[0].x + first.max_radius;
+        fp min_y = parent_origins[0].y - first.max_radius;
+        fp max_y = parent_origins[0].y + first.max_radius;
+        fp min_z = parent_origins[0].z - first.max_radius;
+        fp max_z = parent_origins[0].z + first.max_radius;
         for (std::vector<int>::size_type i = 1;
              i < candidate.parent_horizons.size(); ++i) {
           const struct BH_diagnostics& d =
               state.AH_data_array[candidate.parent_horizons[i]]
                   ->BH_diagnostics;
-          min_x = std::min(min_x, d.origin_x - d.max_radius);
-          max_x = std::max(max_x, d.origin_x + d.max_radius);
-          min_y = std::min(min_y, d.origin_y - d.max_radius);
-          max_y = std::max(max_y, d.origin_y + d.max_radius);
-          min_z = std::min(min_z, d.origin_z - d.max_radius);
-          max_z = std::max(max_z, d.origin_z + d.max_radius);
+          const origin_estimate& p = parent_origins[i];
+          min_x = std::min(min_x, p.x - d.max_radius);
+          max_x = std::max(max_x, p.x + d.max_radius);
+          min_y = std::min(min_y, p.y - d.max_radius);
+          max_y = std::max(max_y, p.y + d.max_radius);
+          min_z = std::min(min_z, p.z - d.max_radius);
+          max_z = std::max(max_z, p.z + d.max_radius);
         }
         const fp center_x = 0.5 * (min_x + max_x);
         const fp center_y = 0.5 * (min_y + max_y);
         const fp center_z = 0.5 * (min_z + max_z);
         fp enclosing_radius = 0.0;
-        for (std::vector<int>::const_iterator parent_hn =
-                 candidate.parent_horizons.begin();
-             parent_hn != candidate.parent_horizons.end(); ++parent_hn) {
-          const struct BH_diagnostics& d =
-              state.AH_data_array[*parent_hn]->BH_diagnostics;
-          const fp dx = center_x - d.origin_x;
-          const fp dy = center_y - d.origin_y;
-          const fp dz = center_z - d.origin_z;
+        for (std::vector<int>::size_type i = 0;
+             i < candidate.parent_horizons.size(); ++i) {
+          const struct BH_diagnostics& d = state.AH_data_array[
+              candidate.parent_horizons[i]]->BH_diagnostics;
+          const origin_estimate& p = parent_origins[i];
+          const fp dx = center_x - p.x;
+          const fp dy = center_y - p.y;
+          const fp dz = center_z - p.z;
           enclosing_radius =
               std::max(enclosing_radius,
                        sqrt(dx*dx + dy*dy + dz*dz) + d.max_radius);
@@ -1181,9 +1370,12 @@ void release_merger_candidates(CCTK_ARGUMENTS)
             merger_enclosing_radius_factor * total_mass;
       }
     } else if (group_is_active) {
-      CCTK_VWarn(FATAL_ERROR, __LINE__, __FILE__, CCTK_THORNSTRING,
-                 "Candidate horizon %d has invalid discovery method %d",
+      CCTK_VWarn(CCTK_WARN_ALERT, __LINE__, __FILE__, CCTK_THORNSTRING,
+                 "Releasing candidate horizon %d with invalid discovery "
+                 "method %d",
                  candidate_hn, int(candidate.candidate_method));
+      group_is_active = false;
+      candidate.candidate_inactive_checks = merger_release_checks;
     }
 
     if (group_is_active) {
@@ -1472,7 +1664,10 @@ if (state.method == method__find_horizons && !calibration_search)
 	            common_parent_surface_area_tolerance,
 	            common_parent_surface_mass_min_fraction,
 	            common_parent_surface_mass_max_fraction)) {
-	      promote_candidate_slot(hn);
+	      if (!promote_candidate_slot(hn)) {
+	        reset_candidate_slot(CCTK_PASS_CTOC, hn);
+	        continue;
+	      }
 	      write_merger_event(CCTK_PASS_CTOC, hn);
 
 	      // find_this was determined before this promotion.  Do not solve the
@@ -1623,15 +1818,28 @@ case method__find_horizons:
 	  {
 	  const struct AH_data& candidate = *state.AH_data_array[*candidate_hn];
 	  bool parent_was_enclosed = false;
+	  bool parent_metadata_valid = candidate.parent_horizons.size() >= 2;
 	  for (std::vector<int>::const_iterator parent_hn =
 	           candidate.parent_horizons.begin();
+	       parent_metadata_valid &&
 	       parent_hn != candidate.parent_horizons.end(); ++parent_hn)
 	    {
+	    if (*parent_hn < 1 || *parent_hn > N_horizons ||
+	        *parent_hn == *candidate_hn) {
+	      parent_metadata_valid = false;
+	      break;
+	    }
 	    parent_was_enclosed =
 	        parent_was_enclosed ||
 	        state.AH_data_array[*parent_hn]->inside_confirmed_merger;
 	    }
-	  if (parent_was_enclosed)
+	  if (!parent_metadata_valid) {
+	    CCTK_VWarn(CCTK_WARN_ALERT, __LINE__, __FILE__, CCTK_THORNSTRING,
+	               "Discarding converged candidate horizon %d with invalid "
+	               "parent metadata", *candidate_hn);
+	    reset_candidate_slot(CCTK_PASS_CTOC, *candidate_hn);
+	  }
+	  else if (parent_was_enclosed)
 	     then {
 		  if (state.my_proc == 0)
 		     then CCTK_VInfo(
@@ -1642,8 +1850,11 @@ case method__find_horizons:
 		  reset_candidate_slot(CCTK_PASS_CTOC, *candidate_hn);
 		  }
 	  else {
-		promote_candidate_slot(*candidate_hn);
-		write_merger_event(CCTK_PASS_CTOC, *candidate_hn);
+		if (promote_candidate_slot(*candidate_hn)) {
+		  write_merger_event(CCTK_PASS_CTOC, *candidate_hn);
+		} else {
+		  reset_candidate_slot(CCTK_PASS_CTOC, *candidate_hn);
+		}
 		}
 	  }
 	// Release is deliberately last: every candidate discovered above first
@@ -1723,6 +1934,7 @@ if (active_flag)
                                                 AH_data.compute_info,
 						cgi, gi,
 						error_info, true,// initial eval
+						-1.0,
 						false,	// no Jacobian coeffs
 						true,	// yes, print msgs
 						&Theta_norms);
@@ -1766,7 +1978,7 @@ if (active_flag)
 		{
                 expansion(NULL, new_compute_info,
 			  cgi, gi,
-			  error_info, true);	// initial evaluation
+			  error_info, true, -1.0);	// initial evaluation
 		}
 	}
 }
@@ -1830,12 +2042,13 @@ struct what_to_compute & compute_info =
 Jacobian* Jac_NP_ptr = active_flag ? AH_data_ptr->Jac_ptr : NULL;
 expansion(ps_ptr, compute_info,
 	  cgi, gi,
-	  error_info, true);		// initial evaluation
+	  error_info, true, -1.0);	// initial evaluation
 Jac_info.Jacobian_compute_method = Jacobian__numerical_perturbation;
 expansion_Jacobian(ps_ptr, Jac_NP_ptr,
                    compute_info,
 		   cgi, gi, Jac_info,
 		   error_info, true,	// initial evaluation
+		   -1.0,
 		   print_msg_flag);
 
 Jacobian* Jac_SD_FDdr_ptr = NULL;
@@ -1850,12 +2063,14 @@ if (test_all_Jacobian_compute_methods)
 	expansion(ps_ptr, compute_info,
 		  cgi, gi,
 		  error_info, true,	// initial evaluation
+		  -1.0,
 		  true);		// compute SD Jacobian coeffs
 	Jac_info.Jacobian_compute_method = Jacobian__symbolic_diff_with_FD_dr;
 	expansion_Jacobian(ps_ptr, Jac_SD_FDdr_ptr,
                            compute_info,
 			   cgi, gi, Jac_info,
 			   error_info, true,	// initial evaluation
+			   -1.0,
 			   print_msg_flag);
 	}
 

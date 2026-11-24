@@ -79,6 +79,9 @@ case expansion_success:
 case expansion_failure__surface_nonfinite:
 	return "infinity/NaN in surface shape!";
 	break;
+case expansion_failure__invalid_configuration:
+	return "invalid expansion configuration";
+	break;
 case expansion_failure__surface_too_large:
 	return "surface too large";
 	break;

@@ -2557,33 +2557,48 @@ static void WriteAttribute (const hid_t dataset, const char* const name, const c
 
 static void WriteAttribute (const hid_t dataset, const char* const name, const char* const values, const int nvalues)
 {
-  assert (dataset>=0);
-  assert (name);
-  assert (values);
-  assert (nvalues>=0);
+  if (dataset < 0 || name == NULL || values == NULL || nvalues < 0) {
+    CCTK_VWarn(CCTK_WARN_ALERT, __LINE__, __FILE__, CCTK_THORNSTRING,
+               "Skipping invalid HDF5 attribute write");
+    return;
+  }
   
   herr_t herr;
   
   const hid_t dataspace = H5Screate (H5S_SCALAR);
-  assert (dataspace>=0);
+  if (dataspace < 0) return;
   
   const hid_t datatype = H5Tcopy (H5T_C_S1);
-  assert (datatype>=0);
+  if (datatype < 0) {
+    H5Sclose(dataspace);
+    return;
+  }
   herr = H5Tset_size (datatype, nvalues);
-  assert (!herr);
+  if (herr < 0) {
+    H5Tclose(datatype);
+    H5Sclose(dataspace);
+    return;
+  }
   
   const hid_t attribute = H5Acreate (dataset, name, datatype, dataspace, H5P_DEFAULT);
-  assert (attribute>=0);
+  if (attribute < 0) {
+    H5Tclose(datatype);
+    H5Sclose(dataspace);
+    return;
+  }
   herr = H5Awrite (attribute, datatype, values);
-  assert (!herr);
+  if (herr < 0) {
+    CCTK_VWarn(CCTK_WARN_ALERT, __LINE__, __FILE__, CCTK_THORNSTRING,
+               "Failed to write HDF5 attribute \"%s\"", name);
+  }
   herr = H5Aclose (attribute);
-  assert (!herr);
+  if (herr < 0) CCTK_WARN(CCTK_WARN_ALERT, "Failed to close HDF5 attribute");
   
   herr = H5Tclose (datatype);
-  assert (!herr);
+  if (herr < 0) CCTK_WARN(CCTK_WARN_ALERT, "Failed to close HDF5 datatype");
   
   herr = H5Sclose (dataspace);
-  assert (!herr);
+  if (herr < 0) CCTK_WARN(CCTK_WARN_ALERT, "Failed to close HDF5 dataspace");
 }
 
 #endif
@@ -2628,7 +2643,11 @@ if (want_ghost_zones && output_xyz_flag && !radius_is_ghosted_flag)
   
   // Get grid hierarchy extentsion from IOUtil
   const ioGH * const iogh = (const ioGH *)CCTK_GHExtension (cctkGH, "IO");
-  assert (iogh);
+  if (iogh == NULL) {
+    CCTK_VWarn(CCTK_WARN_ALERT, __LINE__, __FILE__, CCTK_THORNSTRING,
+               "Skipping AHFinderDirect HDF5 output: IO extension is absent");
+    return;
+  }
   
   struct stat fileinfo;
   if (! iogh->recovered || stat(output_file_name, &fileinfo) != 0) {
@@ -2636,7 +2655,12 @@ if (want_ghost_zones && output_xyz_flag && !radius_is_ghosted_flag)
   } else {
     writer = H5Fopen (output_file_name, H5F_ACC_RDWR, H5P_DEFAULT);
   }
-  assert (writer >= 0);
+  if (writer < 0) {
+    CCTK_VWarn(CCTK_WARN_ALERT, __LINE__, __FILE__, CCTK_THORNSTRING,
+               "Skipping AHFinderDirect HDF5 output: cannot open \"%s\"",
+               output_file_name);
+    return;
+  }
   
   hid_t datatype;
   if (sizeof(fp) == sizeof(float)) {
@@ -2646,9 +2670,15 @@ if (want_ghost_zones && output_xyz_flag && !radius_is_ghosted_flag)
   } else if (sizeof(fp) == sizeof(long double)) {
     datatype = H5T_NATIVE_LDOUBLE;
   } else {
-    assert (0);
+    CCTK_WARN(CCTK_WARN_ALERT,
+              "Skipping AHFinderDirect HDF5 output: unsupported fp type");
+    H5Fclose(writer);
+    return;
   }
-  assert (datatype >= 0);
+  if (datatype < 0) {
+    H5Fclose(writer);
+    return;
+  }
   
   for (int pn=0; pn<N_patches(); ++pn) {
     const patch& p = ith_patch(pn);
@@ -2658,7 +2688,10 @@ if (want_ghost_zones && output_xyz_flag && !radius_is_ghosted_flag)
     shape[1] = p.effective_N_irho(want_ghost_zones);
     
     hid_t dataspace = H5Screate_simple (2, shape, NULL);
-    assert (dataspace >= 0);
+    if (dataspace < 0) {
+      H5Fclose(writer);
+      return;
+    }
     
     
     
@@ -2667,41 +2700,58 @@ if (want_ghost_zones && output_xyz_flag && !radius_is_ghosted_flag)
                    << " it=" << cctkGH->cctk_iteration
                    << " patch=" << pn;
     string datasetnamestr = datasetnamebuf.str();
-    assert (datasetnamestr.size() <= 256); // limit dataset name length
+    if (datasetnamestr.size() > 256) {
+      CCTK_WARN(CCTK_WARN_ALERT, "Skipping overlong HDF5 dataset name");
+      H5Sclose(dataspace);
+      H5Fclose(writer);
+      return;
+    }
     const char * const datasetname = datasetnamestr.c_str();
-    assert (datasetname);
     
     ostringstream datasetnamebufx;
     datasetnamebufx << "x"
                     << " it=" << cctkGH->cctk_iteration
                     << " patch=" << pn;
     string datasetnamestrx = datasetnamebufx.str();
-    assert (datasetnamestrx.size() <= 256); // limit dataset name length
+    if (datasetnamestrx.size() > 256) {
+      H5Sclose(dataspace);
+      H5Fclose(writer);
+      return;
+    }
     const char * const datasetnamex = datasetnamestrx.c_str();
-    assert (datasetnamex);
     
     ostringstream datasetnamebufy;
     datasetnamebufy << "y"
                     << " it=" << cctkGH->cctk_iteration
                     << " patch=" << pn;
     string datasetnamestry = datasetnamebufy.str();
-    assert (datasetnamestry.size() <= 256); // limit dataset name length
+    if (datasetnamestry.size() > 256) {
+      H5Sclose(dataspace);
+      H5Fclose(writer);
+      return;
+    }
     const char * const datasetnamey = datasetnamestry.c_str();
-    assert (datasetnamey);
     
     ostringstream datasetnamebufz;
     datasetnamebufz << "z"
                     << " it=" << cctkGH->cctk_iteration
                     << " patch=" << pn;
     string datasetnamestrz = datasetnamebufz.str();
-    assert (datasetnamestrz.size() <= 256); // limit dataset name length
+    if (datasetnamestrz.size() > 256) {
+      H5Sclose(dataspace);
+      H5Fclose(writer);
+      return;
+    }
     const char * const datasetnamez = datasetnamestrz.c_str();
-    assert (datasetnamez);
     
     
     
     hid_t dataset = H5Dcreate (writer, datasetname, datatype, dataspace, H5P_DEFAULT);
-    assert (dataset >= 0);
+    if (dataset < 0) {
+      H5Sclose(dataspace);
+      H5Fclose(writer);
+      return;
+    }
     
     hid_t datasetx;
     hid_t datasety;
@@ -2709,13 +2759,31 @@ if (want_ghost_zones && output_xyz_flag && !radius_is_ghosted_flag)
     if (output_xyz_flag) {
       
       datasetx = H5Dcreate (writer, datasetnamex, datatype, dataspace, H5P_DEFAULT);
-      assert (datasetx >= 0);
+      if (datasetx < 0) {
+        H5Dclose(dataset);
+        H5Sclose(dataspace);
+        H5Fclose(writer);
+        return;
+      }
       
       datasety = H5Dcreate (writer, datasetnamey, datatype, dataspace, H5P_DEFAULT);
-      assert (datasety >= 0);
+      if (datasety < 0) {
+        H5Dclose(datasetx);
+        H5Dclose(dataset);
+        H5Sclose(dataspace);
+        H5Fclose(writer);
+        return;
+      }
       
       datasetz = H5Dcreate (writer, datasetnamez, datatype, dataspace, H5P_DEFAULT);
-      assert (datasetz >= 0);
+      if (datasetz < 0) {
+        H5Dclose(datasety);
+        H5Dclose(datasetx);
+        H5Dclose(dataset);
+        H5Sclose(dataspace);
+        H5Fclose(writer);
+        return;
+      }
       
     } // if output_xyf_flag
     
@@ -2765,66 +2833,65 @@ if (want_ghost_zones && output_xyz_flag && !radius_is_ghosted_flag)
     
     
     herr = H5Dwrite (dataset, datatype, H5S_ALL, H5S_ALL, H5P_DEFAULT, &tmpdata.front());
-    assert (! herr);
+    if (herr < 0) CCTK_WARN(CCTK_WARN_ALERT, "AHFinderDirect HDF5 write failed");
     
     WriteAttribute (dataset, "name", gfn_name);
     
     herr = H5Dclose (dataset);
-    assert (! herr);
+    if (herr < 0) CCTK_WARN(CCTK_WARN_ALERT, "AHFinderDirect HDF5 close failed");
     
     
     
     if (output_xyz_flag) {
       
       herr = H5Dwrite (datasetx, datatype, H5S_ALL, H5S_ALL, H5P_DEFAULT, &tmpx.front());
-      assert (! herr);
+      if (herr < 0) CCTK_WARN(CCTK_WARN_ALERT, "AHFinderDirect x-coordinate HDF5 write failed");
       
       WriteAttribute (datasetx, "name", "x");
       
       herr = H5Dclose (datasetx);
-      assert (! herr);
+      if (herr < 0) CCTK_WARN(CCTK_WARN_ALERT, "AHFinderDirect HDF5 close failed");
       
       
       
       herr = H5Dwrite (datasety, datatype, H5S_ALL, H5S_ALL, H5P_DEFAULT, &tmpy.front());
-      assert (! herr);
+      if (herr < 0) CCTK_WARN(CCTK_WARN_ALERT, "AHFinderDirect y-coordinate HDF5 write failed");
       
       WriteAttribute (datasety, "name", "y");
       
       herr = H5Dclose (datasety);
-      assert (! herr);
+      if (herr < 0) CCTK_WARN(CCTK_WARN_ALERT, "AHFinderDirect HDF5 close failed");
       
       
       
       herr = H5Dwrite (datasetz, datatype, H5S_ALL, H5S_ALL, H5P_DEFAULT, &tmpz.front());
-      assert (! herr);
+      if (herr < 0) CCTK_WARN(CCTK_WARN_ALERT, "AHFinderDirect z-coordinate HDF5 write failed");
       
       WriteAttribute (datasetz, "name", "z");
       
       herr = H5Dclose (datasetz);
-      assert (! herr);
+      if (herr < 0) CCTK_WARN(CCTK_WARN_ALERT, "AHFinderDirect HDF5 close failed");
       
     } // if output_xyz_flag
     
     
     
     herr = H5Sclose (dataspace);
-    assert (! herr);
+    if (herr < 0) CCTK_WARN(CCTK_WARN_ALERT, "AHFinderDirect HDF5 dataspace close failed");
     
   } // for pn
   
   
   
   herr = H5Fclose (writer);
-  assert (! herr);
+  if (herr < 0) CCTK_WARN(CCTK_WARN_ALERT, "AHFinderDirect HDF5 file close failed");
   
 #else
-  error_exit(ERROR_EXIT,
-"***** patch_system::output_unknown_gridfn(unknown_gfn=%d):\n"
-"        no HDF5 support compiled in.  Cannot write output file \"%s\"\n!"
-,
-             unknown_gfn,
-             output_file_name);					/*NOTREACHED*/
+  CCTK_VWarn(CCTK_WARN_ALERT, __LINE__, __FILE__, CCTK_THORNSTRING,
+             "Skipping unknown-grid output for grid function %d: no HDF5 "
+             "support is compiled in (requested file \"%s\")",
+             unknown_gfn, output_file_name);
+  return;
 
 #endif
 }

@@ -60,6 +60,7 @@ enum expansion_status
 	 const struct geometry_info& gi,
 	 const struct Jacobian_info& Jacobian_info,
 	 const struct error_info& error_info, bool initial_flag,
+	 fp max_allowable_radius,
 	 bool print_msg_flag);
 
 void expansion_Jacobian_partial_SD(patch_system& ps, Jacobian& Jac,
@@ -81,6 +82,7 @@ enum expansion_status
 	 const struct geometry_info& gi,
 	 const struct Jacobian_info& Jacobian_info,
 	 const struct error_info& error_info, bool initial_flag,
+	 fp max_allowable_radius,
 	 bool print_msg_flag);
 	  }
 
@@ -117,6 +119,7 @@ enum expansion_status
 		     const struct geometry_info& gi,
 		     const struct Jacobian_info& Jacobian_info,
 		     const struct error_info& error_info, bool initial_flag,
+		     fp max_allowable_radius,
 		     bool print_msg_flag /* = false */)
 {
 const bool active_flag = (ps_ptr != NULL) && (Jac_ptr != NULL);
@@ -131,6 +134,7 @@ case Jacobian__numerical_perturbation:
 					       compute_info,
 					       cgi, gi, Jacobian_info,
 					       error_info, initial_flag,
+					       max_allowable_radius,
 					       print_msg_flag);
 		if (status != expansion_success)
 		   then return status;			// *** ERROR RETURN ***
@@ -160,6 +164,7 @@ case Jacobian__symbolic_diff_with_FD_dr:
                                           compute_info,
 					  cgi, gi, Jacobian_info,
 					  error_info, initial_flag,
+					  max_allowable_radius,
 					  print_msg_flag);
 	if (status != expansion_success)
 	   then return status;				// *** ERROR RETURN ***
@@ -315,7 +320,10 @@ default:
 #endif
 
    default:
-     assert (0);
+     CCTK_VWarn(CCTK_WARN_ALERT, __LINE__, __FILE__, CCTK_THORNSTRING,
+                "Invalid surface modification %d in expansion Jacobian",
+                int(compute_info.surface_modification));
+     return expansion_failure__invalid_configuration;
    } // switch surface_modification
    
    if (ps_ptr->N_additional_points()) {
@@ -483,15 +491,25 @@ default:
      }
 
      case selection_expansion_areal_radius: {
-       CCTK_WARN (0, "selection_expansion_areal_radius not implemented");
-       break;
+       CCTK_VWarn(CCTK_WARN_ALERT, __LINE__, __FILE__, CCTK_THORNSTRING,
+                  "selection_expansion_areal_radius is not implemented in "
+                  "the expansion Jacobian; rejecting this surface");
+       return expansion_failure__invalid_configuration;
      }
 
      default:
-       assert (0);
+       CCTK_VWarn(CCTK_WARN_ALERT, __LINE__, __FILE__, CCTK_THORNSTRING,
+                  "Invalid surface selection %d in expansion Jacobian",
+                  int(compute_info.surface_selection));
+       return expansion_failure__invalid_configuration;
      } // switch surface_selection
    } else {
-     assert (compute_info.surface_selection == selection_definition);
+    if (compute_info.surface_selection != selection_definition) {
+      CCTK_VWarn(CCTK_WARN_ALERT, __LINE__, __FILE__, CCTK_THORNSTRING,
+                 "Invalid surface selection %d in expansion Jacobian",
+                 int(compute_info.surface_selection));
+      return expansion_failure__invalid_configuration;
+    }
    }
    
  } // if active
@@ -545,6 +563,7 @@ enum expansion_status
 	 const struct geometry_info& gi,
 	 const struct Jacobian_info& Jacobian_info,
 	 const struct error_info& error_info, bool initial_flag,
+	 fp max_allowable_radius,
 	 bool print_msg_flag)
 {
 if (print_msg_flag)
@@ -577,9 +596,16 @@ ps.gridfn_copy(gfns::gfn__mean_curvature, gfns::gfn__save_mean_curvature);
 	  enum expansion_status status = expansion(&ps,
                                                    compute_info,
 						   cgi, gi,
-						   error_info, initial_flag);
+						   error_info, initial_flag,
+						   max_allowable_radius);
 	if (status != expansion_success)
-	   then return status;				// *** ERROR RETURN ***
+	   then {
+		yp.ghosted_gridfn(gfns::gfn__h, y_irho,y_isigma) = save_h_y;
+		ps.gridfn_copy(gfns::gfn__save_Theta, gfns::gfn__Theta);
+		ps.gridfn_copy(gfns::gfn__save_mean_curvature,
+		               gfns::gfn__mean_curvature);
+		return status;				// *** ERROR RETURN ***
+		}
 
 		for (int xpn = 0 ; xpn < ps.N_patches() ; ++xpn)
 		{
@@ -883,6 +909,7 @@ enum expansion_status
 	 const struct geometry_info& gi,
 	 const struct Jacobian_info& Jacobian_info,
 	 const struct error_info& error_info, bool initial_flag,
+	 fp max_allowable_radius,
 	 bool print_msg_flag)
 {
 const bool active_flag = (ps_ptr != NULL) && (Jac_ptr != NULL);
@@ -916,13 +943,20 @@ const
   enum expansion_status status = expansion(ps_ptr,
                                            this_compute_info,
 					   cgi, gi,
-					   error_info, initial_flag);
+					   error_info, initial_flag,
+					   max_allowable_radius);
 if (status != expansion_success)
    then {
+        if (active_flag) {
+          ps_ptr->add_to_ghosted_gridfn(epsilon/2, gfns::gfn__h);
+          ps_ptr->gridfn_copy(gfns::gfn__save_Theta, gfns::gfn__Theta);
+          ps_ptr->gridfn_copy(gfns::gfn__save_mean_curvature,
+                              gfns::gfn__mean_curvature);
+        }
         expansion(NULL,
                   this_compute_info,
                   cgi, gi,
-                  error_info, false);
+                  error_info, false, -1.0);
         return status;					// *** ERROR RETURN ***
   }
 
@@ -936,9 +970,18 @@ const
   enum expansion_status status2 = expansion(ps_ptr,
                                             this_compute_info,
 					    cgi, gi,
-					    error_info, initial_flag);
+					    error_info, initial_flag,
+					    max_allowable_radius);
 if (status2 != expansion_success)
-   then return status2;					// *** ERROR RETURN ***
+   then {
+        if (active_flag) {
+          ps_ptr->add_to_ghosted_gridfn(-epsilon/2, gfns::gfn__h);
+          ps_ptr->gridfn_copy(gfns::gfn__save_Theta, gfns::gfn__Theta);
+          ps_ptr->gridfn_copy(gfns::gfn__save_mean_curvature,
+                              gfns::gfn__mean_curvature);
+        }
+        return status2;				// *** ERROR RETURN ***
+   }
 
 if (active_flag)
    then {
